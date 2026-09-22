@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Markdown Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%235252ff'/%3E%3Cpath d='M3.5 5.5 6 10.5 8.5 5.5l2.5 5 1.5-5' stroke='white' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <style>
+:root {
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --ease: cubic-bezier(.32, .72, 0, 1);
+}
+
+* { box-sizing: border-box; }
+
+[data-theme="dark"] {
+  --bg: #0d0e11;
+  --surface: #131519;
+  --surface-2: #181b21;
+  --line: #23262e;
+  --line-soft: #1c1f26;
+  --text: #e7e9ee;
+  --text-2: #9aa1ad;
+  --text-3: #5d6470;
+  --accent: #7b7bff;
+  --accent-soft: rgba(123, 123, 255, .14);
+  --accent-line: rgba(123, 123, 255, .45);
+  --editor-bg: #101216;
+  --preview-bg: #131519;
+  --code-bg: #1a1d24;
+  --inline-bg: #20242d;
+  --quote-bar: #3a404c;
+  --scroll: #2a2e37;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #fafaf8;
+  --line: #e6e5e0;
+  --line-soft: #eeede9;
+  --text: #1b1c1e;
+  --text-2: #6a6e76;
+  --text-3: #9ba0a8;
+  --accent: #5252ff;
+  --accent-soft: rgba(82, 82, 255, .09);
+  --accent-line: rgba(82, 82, 255, .4);
+  --editor-bg: #fbfbfa;
+  --preview-bg: #ffffff;
+  --code-bg: #f2f1ee;
+  --inline-bg: #ecebe7;
+  --quote-bar: #d4d2cb;
+  --scroll: #d8d6d0;
+  color-scheme: light;
+}
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  transition: background .35s var(--ease), color .35s var(--ease);
+}
+
+#app { height: 100vh; display: flex; flex-direction: column; }
+
+::selection { background: var(--accent-soft); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { border-width: 2px; }
+
+/* ---------- Topbar ---------- */
+
+#topbar {
+  height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  z-index: 20;
+}
+
+.tb-left, .tb-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+.logo em { font-style: normal; color: var(--text-2); font-weight: 500; }
+.logo-mark { fill: var(--accent); }
+
+.icon-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: background .18s var(--ease), color .18s var(--ease), transform .12s var(--ease);
+}
+.icon-btn:hover { background: var(--accent-soft); color: var(--text); }
+.icon-btn:active { transform: scale(.93); }
+.icon-btn.on { color: var(--accent); background: var(--accent-soft); }
+
+.icon-btn .tooltip {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity .15s var(--ease), transform .15s var(--ease);
+  white-space: nowrap;
+  z-index: 30;
+}
+.icon-btn:hover .tooltip { opacity: 1; transform: translateY(0); }
+
+.divider { width: 1px; height: 18px; background: var(--line); margin: 0 2px; }
+
+[data-theme="dark"] #iconSun { display: none; }
+[data-theme="light"] #iconMoon { display: none; }
+
+/* ---------- Work surface ---------- */
+
+#surface { flex: 1; display: flex; min-height: 0; background: var(--bg); }
+
+.pane { min-width: 0; min-height: 0; display: flex; }
+
+#editorPane { flex: 0 0 44%; min-width: 260px; background: var(--editor-bg); }
+#previewPane { flex: 1; background: var(--preview-bg); }
+
+#editor {
+  flex: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 28px 28px 48px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  letter-spacing: .01em;
+  caret-color: var(--accent);
+  tab-size: 2;
+}
+
+#editorPane {
+  overflow: hidden;
+  transition: flex-basis .45s var(--ease), min-width .45s var(--ease), opacity .3s var(--ease);
+}
+#app.editor-hidden #editorPane {
+  flex-basis: 0% !important;
+  min-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+#app.editor-hidden #gutter { width: 0; opacity: 0; }
+
+#gutter {
+  flex: none;
+  width: 1px;
+  background: var(--line);
+  cursor: col-resize;
+  position: relative;
+  z-index: 10;
+  transition: background .2s var(--ease), width .45s var(--ease), opacity .45s var(--ease);
+}
+#gutter::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+#gutter:hover, #gutter.dragging { background: var(--accent-line); }
+
+#previewPane { overflow-y: auto; scroll-behavior: smooth; }
+
+/* ---------- Rendered markdown ---------- */
+
+.md {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 44px 48px 40vh;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text);
+  word-wrap: break-word;
+}
+
+.md > *:first-child { margin-top: 0; }
+
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
+  font-family: var(--font-ui);
+  font-weight: 650;
+  letter-spacing: -.02em;
+  line-height: 1.25;
+  margin: 2em 0 .6em;
+  scroll-margin-top: 24px;
+}
+.md h1 { font-size: 2em; margin-top: .4em; }
+.md h2 {
+  font-size: 1.4em;
+  padding-bottom: .3em;
+  border-bottom: 1px solid var(--line-soft);
+}
+.md h3 { font-size: 1.17em; }
+.md h4 { font-size: 1em; }
+.md h5, .md h6 { font-size: .92em; color: var(--text-2); }
+
+.md p { margin: 0 0 1.1em; }
+
+.md a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-line);
+  transition: border-color .15s var(--ease);
+}
+.md a:hover { border-bottom-color: var(--accent); }
+
+.md strong { font-weight: 650; }
+.md em { font-style: italic; }
+
+.md ul, .md ol { margin: 0 0 1.1em; padding-left: 1.5em; }
+.md li { margin: .3em 0; }
+.md li::marker { color: var(--text-3); }
+
+.md hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 2.2em 0;
+}
+
+.md blockquote {
+  margin: 0 0 1.1em;
+  padding: .1em 0 .1em 1.2em;
+  border-left: 2px solid var(--quote-bar);
+  color: var(--text-2);
+}
+.md blockquote p:last-child { margin-bottom: 0; }
+
+.md code {
+  font-family: var(--font-mono);
+  font-size: .84em;
+  background: var(--inline-bg);
+  padding: .18em .42em;
+  border-radius: 5px;
+}
+
+.md pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0 0 1.2em;
+  line-height: 1.6;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+  font-size: .82em;
+  line-height: inherit;
+}
+
+.md img { max-width: 100%; border-radius: 8px; }
+
+.md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.2em;
+  font-family: var(--font-ui);
+  font-size: .88em;
+}
+.md th, .md td {
+  border: 1px solid var(--line);
+  padding: 7px 12px;
+  text-align: left;
+}
+.md th { background: var(--surface-2); font-weight: 600; }
+
+.md input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin-right: .45em;
+  transform: translateY(1px);
+}
+
+#preview.is-empty { display: flex; align-items: center; justify-content: center; }
+#preview.is-empty .empty-hint {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  color: var(--text-3);
+  border: 1px dashed var(--line);
+  padding: 10px 18px;
+  border-radius: 10px;
+  user-select: none;
+}
+
+/* ---------- Statusbar ---------- */
+
+#statusbar {
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.st-left, .st-right { display: flex; align-items: center; gap: 10px; }
+.dot { opacity: .5; }
+#statSaved.flash { color: var(--accent); }
+
+/* ---------- Entrance ---------- */
+
+#topbar, #surface, #statusbar { animation: rise .5s var(--ease) backwards; }
+#surface { animation-delay: .05s; }
+#statusbar { animation-delay: .1s; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 760px) {
+  #app:not(.editor-hidden) #surface { flex-direction: column; }
+  #editorPane { flex: 0 0 42% !important; min-width: 0; }
+  #gutter { display: none; }
+  #app:not(.editor-hidden) #previewPane { display: none; }
+  .md { padding: 28px 22px 30vh; }
+  #editor { padding: 20px 20px 40px; }
+  .logo span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  #previewPane { scroll-behavior: auto; }
+}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="tb-left">
+        <button id="menuBtn" class="icon-btn on" title="Show / hide editor (⌘B)" aria-label="Show / hide editor" aria-pressed="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M3.5 6.5h13M3.5 10h13M3.5 13.5h13" />
+          </svg>
+        </button>
+        <div class="logo">
+          <svg viewBox="0 0 16 16" width="17" height="17" aria-hidden="true">
+            <rect width="16" height="16" rx="4.5" class="logo-mark" />
+            <path d="M3.8 5.6 6 10.4l2.2-4.8 2.2 4.8 1.6-4.8" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Markdown<em>Viewer</em></span>
+        </div>
+      </div>
+
+      <div class="tb-right">
+        <button id="exportBtn" class="icon-btn" title="Download as .md" aria-label="Download as .md">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3.5v8m0 0 3-3m-3 3-3-3" />
+            <path d="M4 13.5v1.5A1.5 1.5 0 0 0 5.5 16.5h9A1.5 1.5 0 0 0 16 15v-1.5" />
+          </svg>
+        </button>
+        <div class="divider" role="separator"></div>
+        <button id="themeBtn" class="icon-btn" title="Toggle theme (⌘D)" aria-label="Toggle theme">
+          <svg id="iconSun" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="10" cy="10" r="3.5" />
+            <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4" />
+          </svg>
+          <svg id="iconMoon" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 11.5A6.5 6.5 0 0 1 8.5 4a6.5 6.5 0 1 0 7.5 7.5Z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="surface">
+      <section id="editorPane" class="pane">
+        <textarea id="editor" spellcheck="false" placeholder="# Start writing Markdown…" aria-label="Markdown source"></textarea>
+      </section>
+      <div id="gutter" role="separator" aria-orientation="vertical"></div>
+      <section id="previewPane" class="pane">
+        <article id="preview" class="md"></article>
+      </section>
+    </main>
+
+    <footer id="statusbar">
+      <div class="st-left">
+        <span id="statStats" class="stat">0 words</span>
+        <span class="dot">•</span>
+        <span id="statSaved" class="stat">Saved</span>
+      </div>
+      <div class="st-right">
+        <span id="statPos" class="stat">Ln 1, Col 1</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+(() => {
+  "use strict";
+
+  /* ---------- DOM ---------- */
+  const $ = (s) => document.querySelector(s);
+  const app = $("#app");
+  const editor = $("#editor");
+  const preview = $("#preview");
+  const gutter = $("#gutter");
+  const surface = $("#surface");
+  const previewPane = $("#previewPane");
+  const editorPane = $("#editorPane");
+  const menuBtn = $("#menuBtn");
+  const themeBtn = $("#themeBtn");
+  const exportBtn = $("#exportBtn");
+  const statWords = $("#statStats");
+  const statSaved = $("#statSaved");
+  const statPos = $("#statPos");
+
+  /* ---------- Persistence ---------- */
+  const KEY = {
+    text: "mdv.text",
+    theme: "mdv.theme",
+    editor: "mdv.editor",
+    split: "mdv.split",
+  };
+  const store = {
+    get(k, fallback) {
+      try {
+        const v = localStorage.getItem(k);
+        return v === null ? fallback : v;
+      } catch { return fallback; }
+    },
+    set(k, v) {
+      try { localStorage.setItem(k, v); } catch { /* private mode */ }
+    },
+  };
+
+  const WELCOME = `# Markdown Viewer
+
+A minimal, focused place to write and read **Markdown**.
+
+## Features
+
+- Live preview as you type
+- Toggle the editor away with the ☰ button — or \`⌘B\`
+- Dark & light themes (\`⌘D\`)
+- Everything saves to your browser automatically
+
+## Writing basics
+
+| Syntax | Result |
+| :-- | --: |
+| \`**bold**\` | **bold** |
+| \`*italic*\` | *italic* |
+| \`~~gone~~\` | ~~gone~~ |
+
+> "Simplicity is the ultimate sophistication."
+> — Leonardo da Vinci
+
+1. Write on the left
+2. Read on the right
+3. Drag the divider to rebalance
+
+\`\`\`js
+const focus = "less, but better";
+\`\`\`
+
+- [x] ship a beautiful viewer
+- [ ] write something great in it
+`;
+
+  /* ============================================================
+     Markdown engine — safe by construction
+     ============================================================ */
+  const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ESC[c]);
+  const escapeAttr = (url) => esc(url).replace(/`/g, "%60");
+
+  function safeUrl(raw) {
+    const t = raw.trim();
+    if (/^(https?:|mailto:|#|\/)/i.test(t)) return t;
+    if (/^[^:\s]+\.[^:\s]{2,}$/i.test(t) && !t.includes("..")) {
+      return "https://" + t;
+    }
+    return null;
+  }
+
+  /* ---------- inline ---------- */
+  function renderInline(text) {
+    const s = esc(text);
+    let out = "";
+    let i = 0;
+
+    while (i < s.length) {
+      const rest = s.slice(i);
+      let m;
+
+      m = rest.match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/);
+      if (m) {
+        const url = safeUrl(m[2]);
+        out += url
+          ? `<img src="${escapeAttr(url)}" alt="${m[1]}" />`
+          : `<em>[image: ${m[1]}]</em>`;
+        i += m[0].length;
+        continue;
+      }
+
+      m = rest.match(/^\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/);
+      if (m) {
+        const url = safeUrl(m[2]);
+        out += url
+          ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${renderInline(m[1])}</a>`
+          : renderInline(m[1]);
+        i += m[0].length;
+        continue;
+      }
+
+      m = rest.match(/^`([^`]+)`/);
+      if (m) { out += `<code>${m[1]}</code>`; i += m[0].length; continue; }
+
+      m = rest.match(/^\*\*\*([^*]+)\*\*\*/);
+      if (m) { out += `<strong><em>${m[1]}</em></strong>`; i += m[0].length; continue; }
+
+      m = rest.match(/^\*\*([^*]+)\*\*/);
+      if (m) { out += `<strong>${m[1]}</strong>`; i += m[0].length; continue; }
+      m = rest.match(/^__([^_]+)__/);
+      if (m) { out += `<strong>${m[1]}</strong>`; i += m[0].length; continue; }
+
+      m = rest.match(/^\*([^*]+)\*/);
+      if (m) { out += `<em>${m[1]}</em>`; i += m[0].length; continue; }
+      m = rest.match(/^_([^_]+)_/);
+      if (m) { out += `<em>${m[1]}</em>`; i += m[0].length; continue; }
+
+      m = rest.match(/^~~([^~]+)~~/);
+      if (m) { out += `<del>${m[1]}</del>`; i += m[0].length; continue; }
+
+      m = rest.match(/^https?:\/\/[^\s<]+/);
+      if (m) {
+        out += `<a href="${m[0]}" target="_blank" rel="noopener noreferrer">${m[0]}</a>`;
+        i += m[0].length;
+        continue;
+      }
+
+      m = rest.match(/^((?:[a-z0-9-]+\.)+(?:com|org|net|io|dev|app|ai|co|me|so|sh|gg|xyz|to)(?:\/[^\s<]*)?)/i);
+      if (m && (i === 0 || /[\s(]/.test(s[i - 1]))) {
+        out += `<a href="https://${m[1]}" target="_blank" rel="noopener noreferrer">${m[1]}</a>`;
+        i += m[0].length;
+        continue;
+      }
+
+      out += s[i];
+      i += 1;
+    }
+    return out;
+  }
+
+  /* ---------- blocks ---------- */
+  function renderBlocks(src) {
+    const lines = src.replace(/\r\n?/g, "\n").split("\n");
+    const out = [];
+    let i = 0;
+    let m;
+
+    const peek = (k = 0) => lines[i + k] ?? "";
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (!line.trim()) { i++; continue; }
+
+      m = line.match(/^(`{3,}|~{3,})\s*([\w+-]*)\s*$/);
+      if (m) {
+        const lang = m[2];
+        const closeRe = new RegExp("^" + m[1][0] + "{3,}\\s*$");
+        const body = [];
+        i++;
+        while (i < lines.length && !closeRe.test(lines[i])) {
+          body.push(lines[i]);
+          i++;
+        }
+        i++;
+        out.push(`<pre data-lang="${esc(lang)}"><code>${esc(body.join("\n"))}</code></pre>`);
+        continue;
+      }
+
+      m = line.match(/^(#{1,6})\s+(.*)$/);
+      if (m) {
+        const level = m[1].length;
+        out.push(`<h${level}>${renderInline(m[2].replace(/\s#+\s*$/, ""))}</h${level}>`);
+        i++;
+        continue;
+      }
+
+      if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+        out.push("<hr />");
+        i++;
+        continue;
+      }
+
+      if (/^\s*>/.test(line)) {
+        const body = [];
+        while (
+          i < lines.length &&
+          (/^\s*>/.test(lines[i]) ||
+            (body.length && lines[i].trim() &&
+             !/^\s*(?:#{1,6}\s|`{3,}|~{3,})/.test(lines[i])))
+        ) {
+          body.push(lines[i].replace(/^\s*>\s?/, ""));
+          i++;
+        }
+        out.push(`<blockquote>${renderBlocks(body.join("\n"))}</blockquote>`);
+        continue;
+      }
+
+      const li = line.match(/^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/);
+      if (li) {
+        const ordered = /\d/.test(li[2]);
+        const baseIndent = li[1].length;
+        const items = [];
+        let para = [];
+
+        const flushPara = () => {
+          if (para.length) {
+            items.push({ t: "p", text: para.join(" ") });
+            para = [];
+          }
+        };
+
+        while (i < lines.length) {
+          const cur = lines[i];
+          if (!cur.trim()) break;
+
+          const cm = cur.match(/^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/);
+          if (cm && cm[1].length >= baseIndent) {
+            flushPara();
+            let content = cm[3];
+            let task = null;
+            const tm = content.match(/^\[([ xX])\]\s+(.*)$/);
+            if (tm) {
+              task = tm[1] !== " ";
+              content = tm[2];
+            }
+            items.push({ t: task === null ? "li" : "task", done: task, text: content });
+            i++;
+            continue;
+          }
+
+          if (cm && cm[1].length > baseIndent) { i++; continue; }
+
+          if (items.length && /^\s{2,}/.test(cur)) {
+            para.push(cur.trim());
+            i++;
+            continue;
+          }
+
+          if (items.length && /^\S/.test(cur) && para.length === 0) {
+            const last = items[items.length - 1];
+            if (last && last.t !== "p") {
+              items[items.length - 1] = { text: last.text + " " + cur.trim(), t: last.t, done: last.done };
+              i++;
+              continue;
+            }
+          }
+
+          flushPara();
+          break;
+        }
+        flushPara();
+
+        const tag = ordered ? "ol" : "ul";
+        let html = "<" + tag + ">";
+        for (const it of items) {
+          if (it.t === "p") {
+            html += `<li>${renderInline(it.text)}</li>`;
+            continue;
+          }
+          const check = it.t === "task"
+            ? `<input type="checkbox" disabled${it.done ? " checked" : ""} />`
+            : "";
+          html += `<li>${check}${renderInline(it.text)}</li>`;
+        }
+        out.push(html + "</" + tag + ">");
+        continue;
+      }
+
+      if (
+        /\|/.test(line) &&
+        /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(peek(1)) &&
+        /-/.test(peek(1))
+      ) {
+        const parseRow = (row) => {
+          let r = row.trim();
+          if (r.startsWith("|")) r = r.slice(1);
+          if (r.endsWith("|")) r = r.slice(0, -1);
+          return r.split("|").map((c) => c.trim());
+        };
+        const alignOf = (c) => {
+          const l = c.startsWith(":");
+          const r = c.endsWith(":");
+          if (l && r) return ' style="text-align:center"';
+          if (r) return ' style="text-align:right"';
+          return "";
+        };
+        const header = parseRow(line);
+        const aligns = parseRow(peek(1)).map(alignOf);
+        i += 2;
+
+        const rows = [];
+        while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
+          rows.push(parseRow(lines[i]));
+          i++;
+        }
+
+        let html = "<table><thead><tr>";
+        header.forEach((c, k) => {
+          html += `<th${aligns[k] || ""}>${renderInline(c)}</th>`;
+        });
+        html += "</tr></thead>";
+        if (rows.length) {
+          html += "<tbody>";
+          for (const r of rows) {
+            html += "<tr>" + r.map((c, k) => `<td${aligns[k] || ""}>${renderInline(c)}</td>`).join("") + "</tr>";
+          }
+          html += "</tbody>";
+        }
+        out.push(html + "</table>");
+        continue;
+      }
+
+      const para = [];
+      while (
+        i < lines.length &&
+        lines[i].trim() &&
+        !/^(#{1,6}\s|\s*>|\s*(?:-{3,}|\*{3,}|_{3,})\s*$|(`{3,}|~{3,})|\s*(?:[-*+]|\d{1,9}[.)])\s)/.test(lines[i])
+      ) {
+        para.push(lines[i]);
+        i++;
+      }
+      if (para.length) {
+        out.push(`<p>${renderInline(para.join("\n")).replace(/\n/g, "<br />")}</p>`);
+      } else {
+        i++;
+      }
+    }
+
+    return out.join("\n");
+  }
+
+  const renderMarkdown = (src) => renderBlocks(src.replace(/\u0000/g, ""));
+
+  /* ============================================================
+     Rendering pipeline
+     ============================================================ */
+  let renderTimer = null;
+  const scheduleRender = () => {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(render, 80);
+  };
+
+  let saveTimer = null;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    statSaved.textContent = "Saving…";
+    statSaved.classList.remove("flash");
+    saveTimer = setTimeout(() => {
+      store.set(KEY.text, editor.value);
+      statSaved.textContent = "Saved";
+      statSaved.classList.add("flash");
+      setTimeout(() => statSaved.classList.remove("flash"), 1200);
+    }, 500);
+  }
+
+  function render() {
+    const src = editor.value;
+    const isEmpty = src.trim().length === 0;
+    const prevScroll = previewPane.scrollTop;
+    const atBottom =
+      previewPane.scrollHeight - previewPane.scrollTop - previewPane.clientHeight < 4;
+    const wasEmpty = preview.classList.contains("is-empty");
+
+    preview.classList.toggle("is-empty", isEmpty);
+    preview.innerHTML = isEmpty
+      ? `<div class="empty-hint">Preview appears here — start typing on the left</div>`
+      : renderMarkdown(src);
+
+    if (!isEmpty) {
+      if (atBottom) {
+        previewPane.scrollTop = previewPane.scrollHeight;
+      } else if (!wasEmpty) {
+        previewPane.scrollTop = prevScroll;
+      }
+    }
+
+    updateStats(src);
+  }
+
+  /* ---------- status ---------- */
+  function updateStats(src) {
+    const words = (src.trim().match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu) || []).length;
+    statWords.textContent = `${words.toLocaleString()} word${words === 1 ? "" : "s"}`;
+  }
+
+  function updateCaret() {
+    const upto = editor.value.slice(0, editor.selectionStart);
+    const nl = upto.split("\n");
+    statPos.textContent = `Ln ${nl.length}, Col ${nl[nl.length - 1].length + 1}`;
+  }
+
+  /* ---------- theme ---------- */
+  function applyTheme(t) {
+    document.documentElement.dataset.theme = t;
+    store.set(KEY.theme, t);
+  }
+  themeBtn.addEventListener("click", () => {
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
+
+  /* ---------- editor show / hide ---------- */
+  function setEditorVisible(visible, persist = true) {
+    app.classList.toggle("editor-hidden", !visible);
+    menuBtn.classList.toggle("on", visible);
+    menuBtn.setAttribute("aria-pressed", String(visible));
+    if (persist) store.set(KEY.editor, visible ? "1" : "0");
+  }
+  menuBtn.addEventListener("click", () =>
+    setEditorVisible(app.classList.contains("editor-hidden"))
+  );
+
+  /* ---------- pane resize ---------- */
+  function initGutter() {
+    let dragging = false;
+    let raf = 0;
+
+    gutter.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      gutter.classList.add("dragging");
+      gutter.setPointerCapture(e.pointerId);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    });
+
+    gutter.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const rect = surface.getBoundingClientRect();
+        let pct = ((e.clientX - rect.left) / rect.width) * 100;
+        pct = Math.min(75, Math.max(20, pct));
+        editorPane.style.flexBasis = pct + "%";
+        store.set(KEY.split, String(Math.round(pct)));
+      });
+    });
+
+    const endDrag = () => {
+      dragging = false;
+      gutter.classList.remove("dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    gutter.addEventListener("pointerup", endDrag);
+    gutter.addEventListener("pointercancel", endDrag);
+  }
+
+  /* ---------- scroll sync ---------- */
+  function initScrollSync() {
+    let syncing = false;
+    let raf = 0;
+
+    editor.addEventListener("scroll", () => {
+      if (syncing || app.classList.contains("editor-hidden")) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const eMax = editor.scrollHeight - editor.clientHeight;
+        const pMax = previewPane.scrollHeight - previewPane.clientHeight;
+        if (eMax <= 0 || pMax <= 0) return;
+        syncing = true;
+        previewPane.scrollTop = (editor.scrollTop / eMax) * pMax;
+        requestAnimationFrame(() => { syncing = false; });
+      });
+    }, { passive: true });
+  }
+
+  editor.addEventListener("input", () => {
+    scheduleRender();
+    scheduleSave();
+    updateCaret();
+  });
+  editor.addEventListener("keyup", updateCaret);
+  editor.addEventListener("click", updateCaret);
+
+  /* ---------- keyboard shortcuts ---------- */
+  document.addEventListener("keydown", (e) => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (!meta) return;
+    const k = e.key.toLowerCase();
+
+    if (k === "s") {
+      e.preventDefault();
+      store.set(KEY.text, editor.value);
+      statSaved.textContent = "Saved";
+      statSaved.classList.add("flash");
+      setTimeout(() => statSaved.classList.remove("flash"), 1200);
+    }
+    if (k === "b") {
+      e.preventDefault();
+      setEditorVisible(app.classList.contains("editor-hidden"));
+    }
+    if (k === "d") {
+      e.preventDefault();
+      themeBtn.click();
+    }
+  });
+
+  /* ---------- export ---------- */
+  exportBtn.addEventListener("click", () => {
+    const blob = new Blob([editor.value], { type: "text/markdown;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const title =
+      ((editor.value.match(/^\s*#\s+(.+)$/m) || [])[1] || "document")
+        .trim().slice(0, 60);
+    a.download = title.replace(/[\\/:*?"<>|]/g, "-") + ".md";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  /* ---------- restore state ---------- */
+  (function restore() {
+    const saved = store.get(KEY.text, null);
+    editor.value = saved !== null ? saved : WELCOME;
+
+    applyTheme(
+      store.get(KEY.theme, null) ||
+      (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+    );
+
+    setEditorVisible(store.get(KEY.editor, "1") !== "0", false);
+
+    const split = parseFloat(store.get(KEY.split, "44"));
+    if (!Number.isNaN(split)) editorPane.style.flexBasis = split + "%";
+
+    render();
+    updateCaret();
+  })();
+
+  initGutter();
+  initScrollSync();
+})();
+  </script>
+</body>
+</html>
