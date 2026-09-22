@@ -384,6 +384,155 @@ body {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   #previewPane { scroll-behavior: auto; }
 }
+
+/* ---------- Modal ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .58);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn .18s var(--ease);
+}
+.modal-backdrop[hidden] {
+  display: none !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 660px;
+  max-height: 86vh;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popIn .22s var(--ease);
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.modal-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+.modal-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.modal-close {
+  color: var(--text-2);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px 24px;
+}
+
+@media (max-width: 620px) {
+  .shortcuts-grid { grid-template-columns: 1fr; gap: 16px; }
+  .modal-card { max-height: 90vh; }
+}
+
+.shortcut-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4.5px 0;
+  font-size: 12.5px;
+  gap: 12px;
+}
+.shortcut-desc {
+  color: var(--text-2);
+}
+.shortcut-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .08);
+}
+
+/* ---------- Print ---------- */
+
+@media print {
+  #topbar, #statusbar, #editorPane, #gutter, .modal-backdrop {
+    display: none !important;
+  }
+  #app, #surface, #previewPane {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  .md {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+}
   </style>
 </head>
 <body>
@@ -405,10 +554,21 @@ body {
       </div>
 
       <div class="tb-right">
-        <button id="exportBtn" class="icon-btn" title="Download as .md" aria-label="Download as .md">
+        <button id="openBtn" class="icon-btn" title="Open file (⌘O)" aria-label="Open markdown file">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3.5 16.5h13a1.5 1.5 0 0 0 1.5-1.5V7a1.5 1.5 0 0 0-1.5-1.5h-4.8l-1.7-2H3.5A1.5 1.5 0 0 0 2 5v10a1.5 1.5 0 0 0 1.5 1.5Z" />
+          </svg>
+        </button>
+        <button id="exportBtn" class="icon-btn" title="Download as .md (⌘⇧S)" aria-label="Download as .md">
           <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10 3.5v8m0 0 3-3m-3 3-3-3" />
             <path d="M4 13.5v1.5A1.5 1.5 0 0 0 5.5 16.5h9A1.5 1.5 0 0 0 16 15v-1.5" />
+          </svg>
+        </button>
+        <button id="shortcutsBtn" class="icon-btn" title="Keyboard shortcuts (⌘/)" aria-label="Keyboard shortcuts">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2.5" y="4.5" width="15" height="11" rx="2.5" />
+            <path d="M5.5 8h.01M8.5 8h.01M11.5 8h.01M14.5 8h.01M5.5 11h.01M7.5 12.5h5M14.5 11h.01" stroke-width="1.8" />
           </svg>
         </button>
         <div class="divider" role="separator"></div>
@@ -446,6 +606,157 @@ body {
     </footer>
   </div>
 
+  <div id="shortcutsModal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle" class="modal-title">Keyboard Shortcuts</h2>
+          <p class="modal-subtitle">Quick shortcuts for writing and managing Markdown</p>
+        </div>
+        <button id="modalCloseBtn" class="icon-btn modal-close" aria-label="Close shortcuts modal" title="Close (Esc)">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M5 5l10 10M15 5L5 15" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcuts-grid">
+          <div class="shortcut-group">
+            <div class="shortcut-group-title">Formatting</div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Bold</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>B</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Italic</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>I</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Inline Code</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>E</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Link</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>K</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Strikethrough</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>X</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Code Block</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>C</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Heading 1–6</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⌥" data-win="Alt">⌥</kbd><kbd>1–6</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Normal Paragraph</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⌥" data-win="Alt">⌥</kbd><kbd>0</kbd></span>
+            </div>
+          </div>
+
+          <div class="shortcut-group">
+            <div class="shortcut-group-title">Lists & Blocks</div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Bullet List</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>U</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Numbered List</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>O</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Task List</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>T</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Blockquote</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>Q</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Horizontal Rule</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>H</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Indent Line(s)</span>
+              <span class="shortcut-keys"><kbd>Tab</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Outdent Line(s)</span>
+              <span class="shortcut-keys"><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>Tab</kbd></span>
+            </div>
+          </div>
+
+          <div class="shortcut-group">
+            <div class="shortcut-group-title">Document & View</div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Toggle Editor</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>\</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Toggle Theme</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>D</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Save Document</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>S</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Open File (.md)</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>O</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Export as .md</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>S</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">New Document</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⌥" data-win="Alt">⌥</kbd><kbd>N</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Print / Save PDF</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>P</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Shortcuts Cheat Sheet</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd>/</kbd></span>
+            </div>
+          </div>
+
+          <div class="shortcut-group">
+            <div class="shortcut-group-title">Editor Helpers</div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Wrap Selection</span>
+              <span class="shortcut-keys"><kbd>(</kbd><kbd>[</kbd><kbd>{</kbd><kbd>"</kbd><kbd>`</kbd><kbd>*</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Continue List</span>
+              <span class="shortcut-keys"><kbd>Enter</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Soft Line Break</span>
+              <span class="shortcut-keys"><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>Enter</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Duplicate Line</span>
+              <span class="shortcut-keys"><kbd data-mac="⌘" data-win="Ctrl">⌘</kbd><kbd data-mac="⇧" data-win="Shift">⇧</kbd><kbd>D</kbd></span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Exit List / Quote</span>
+              <span class="shortcut-keys"><kbd>Enter</kbd> on empty</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-desc">Close Dialog</span>
+              <span class="shortcut-keys"><kbd>Esc</kbd></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
 (() => {
   "use strict";
@@ -462,6 +773,10 @@ body {
   const menuBtn = $("#menuBtn");
   const themeBtn = $("#themeBtn");
   const exportBtn = $("#exportBtn");
+  const openBtn = $("#openBtn");
+  const shortcutsBtn = $("#shortcutsBtn");
+  const shortcutsModal = $("#shortcutsModal");
+  const modalCloseBtn = $("#modalCloseBtn");
   const statWords = $("#statStats");
   const statSaved = $("#statSaved");
   const statPos = $("#statPos");
@@ -492,8 +807,9 @@ A minimal, focused place to write and read **Markdown**.
 ## Features
 
 - Live preview as you type
-- Toggle the editor away with the ☰ button — or \`⌘B\`
+- Toggle the editor away with the ☰ button — or \`⌘\\\` / \`⌘B\`
 - Dark & light themes (\`⌘D\`)
+- Full keyboard shortcuts: press \`⌘/\` for cheat sheet
 - Everything saves to your browser automatically
 
 ## Writing basics
@@ -820,6 +1136,14 @@ const focus = "less, but better";
     }, 500);
   }
 
+  function scheduleSaveNow() {
+    clearTimeout(saveTimer);
+    store.set(KEY.text, editor.value);
+    statSaved.textContent = "Saved";
+    statSaved.classList.add("flash");
+    setTimeout(() => statSaved.classList.remove("flash"), 1200);
+  }
+
   function render() {
     const src = editor.value;
     const isEmpty = src.trim().length === 0;
@@ -938,26 +1262,577 @@ const focus = "less, but better";
   editor.addEventListener("keyup", updateCaret);
   editor.addEventListener("click", updateCaret);
 
+  /* ---------- text editing & formatting helpers ---------- */
+  function insertText(text) {
+    editor.focus();
+    let handled = false;
+    try {
+      handled = document.execCommand("insertText", false, text);
+    } catch {
+      handled = false;
+    }
+    if (!handled) {
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.setRangeText(text, start, end, "end");
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    scheduleRender();
+    scheduleSave();
+    updateCaret();
+  }
+
+  function applyWrap(prefix, suffix = prefix) {
+    editor.focus();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const val = editor.value;
+    const selected = val.slice(start, end);
+
+    // If selection is already wrapped with prefix & suffix, unwrap
+    if (
+      selected.length >= prefix.length + suffix.length &&
+      selected.startsWith(prefix) &&
+      selected.endsWith(suffix) &&
+      (prefix !== "*" || (!selected.startsWith("**") && !selected.endsWith("**")))
+    ) {
+      const unwrapped = selected.slice(prefix.length, selected.length - suffix.length);
+      editor.setSelectionRange(start, end);
+      insertText(unwrapped);
+      editor.setSelectionRange(start, start + unwrapped.length);
+      return;
+    }
+
+    // If cursor/selection is directly surrounded by delimiters
+    const before = val.slice(Math.max(0, start - prefix.length), start);
+    const after = val.slice(end, end + suffix.length);
+    if (
+      before === prefix &&
+      after === suffix &&
+      (prefix !== "*" || (val.slice(Math.max(0, start - 2), start) !== "**" && val.slice(end, end + 2) !== "**"))
+    ) {
+      editor.setSelectionRange(start - prefix.length, end + suffix.length);
+      insertText(selected);
+      editor.setSelectionRange(start - prefix.length, start - prefix.length + selected.length);
+      return;
+    }
+
+    // Otherwise wrap
+    if (selected.length > 0) {
+      const wrapped = prefix + selected + suffix;
+      editor.setSelectionRange(start, end);
+      insertText(wrapped);
+      editor.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+    } else {
+      const emptyWrap = prefix + suffix;
+      insertText(emptyWrap);
+      editor.setSelectionRange(start + prefix.length, start + prefix.length);
+    }
+  }
+
+  function applyLink() {
+    editor.focus();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const val = editor.value;
+    const selected = val.slice(start, end).trim();
+
+    const isUrl = /^https?:\/\/[^\s]+$/i.test(selected);
+    if (isUrl) {
+      const text = `[title](${selected})`;
+      editor.setSelectionRange(start, end);
+      insertText(text);
+      editor.setSelectionRange(start + 1, start + 6);
+    } else if (selected.length > 0) {
+      const text = `[${selected}](url)`;
+      editor.setSelectionRange(start, end);
+      insertText(text);
+      const urlStart = start + 1 + selected.length + 2;
+      editor.setSelectionRange(urlStart, urlStart + 3);
+    } else {
+      const text = "[title](https://)";
+      insertText(text);
+      editor.setSelectionRange(start + 1, start + 6);
+    }
+  }
+
+  function applyCodeBlock() {
+    editor.focus();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const val = editor.value;
+    const selected = val.slice(start, end);
+
+    if (selected.length > 0) {
+      const text = "```\n" + selected + "\n```";
+      editor.setSelectionRange(start, end);
+      insertText(text);
+      editor.setSelectionRange(start + 4, start + 4 + selected.length);
+    } else {
+      const text = "```\n\n```";
+      insertText(text);
+      editor.setSelectionRange(start + 4, start + 4);
+    }
+  }
+
+  function transformSelectedLines(fn) {
+    editor.focus();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const val = editor.value;
+
+    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    let lineEnd = val.indexOf("\n", end);
+    if (lineEnd === -1) lineEnd = val.length;
+
+    const originalBlock = val.slice(lineStart, lineEnd);
+    const lines = originalBlock.split("\n");
+    const newLines = fn(lines);
+    const newBlock = newLines.join("\n");
+
+    editor.setSelectionRange(lineStart, lineEnd);
+    insertText(newBlock);
+    editor.setSelectionRange(lineStart, lineStart + newBlock.length);
+  }
+
+  function applyHeading(level) {
+    transformSelectedLines((lines) => {
+      return lines.map((l) => {
+        const stripped = l.replace(/^\s*#{1,6}\s+/, "");
+        if (level === 0) return stripped;
+        return `${"#".repeat(level)} ${stripped}`;
+      });
+    });
+  }
+
+  function applyList(type) {
+    transformSelectedLines((lines) => {
+      let allHave = true;
+      for (const l of lines) {
+        if (!l.trim()) continue;
+        if (type === "bullet" && !/^\s*[-*+]\s+/.test(l)) allHave = false;
+        if (type === "number" && !/^\s*\d+[.)]\s+/.test(l)) allHave = false;
+        if (type === "task" && !/^\s*[-*+]\s+\[(?: |x|X)\]\s+/.test(l)) allHave = false;
+        if (type === "quote" && !/^\s*>\s?/.test(l)) allHave = false;
+      }
+
+      let num = 1;
+      return lines.map((l) => {
+        if (!l.trim()) return l;
+        const clean = l.replace(/^\s*(?:[-*+]\s+(?:\[(?: |x|X)\]\s+)?|\d+[.)]\s+|>\s?)/, "");
+        if (allHave) return clean;
+        if (type === "bullet") return `- ${clean}`;
+        if (type === "number") return `${num++}. ${clean}`;
+        if (type === "task") return `- [ ] ${clean}`;
+        if (type === "quote") return `> ${clean}`;
+        return l;
+      });
+    });
+  }
+
+  function applyHorizontalRule() {
+    editor.focus();
+    const start = editor.selectionStart;
+    const val = editor.value;
+    const prevChar = start > 0 ? val[start - 1] : "\n";
+    const hr = (prevChar === "\n" ? "" : "\n") + "---\n";
+    insertText(hr);
+  }
+
+  function duplicateCurrentLine() {
+    editor.focus();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const val = editor.value;
+
+    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    let lineEnd = val.indexOf("\n", end);
+    if (lineEnd === -1) lineEnd = val.length;
+
+    const lines = val.slice(lineStart, lineEnd);
+    editor.setSelectionRange(lineEnd, lineEnd);
+    insertText("\n" + lines);
+    editor.setSelectionRange(start + lines.length + 1, end + lines.length + 1);
+  }
+
+  function handleTab(shiftKey) {
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const val = editor.value;
+
+    if (start !== end || val.slice(start, end).includes("\n")) {
+      const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+      let lineEnd = val.indexOf("\n", end);
+      if (lineEnd === -1) lineEnd = val.length;
+
+      const lines = val.slice(lineStart, lineEnd).split("\n");
+      const modified = shiftKey
+        ? lines.map((l) => l.replace(/^ {1,2}/, ""))
+        : lines.map((l) => "  " + l);
+      const newBlock = modified.join("\n");
+      editor.setSelectionRange(lineStart, lineEnd);
+      insertText(newBlock);
+      editor.setSelectionRange(lineStart, lineStart + newBlock.length);
+    } else {
+      if (shiftKey) {
+        const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+        const beforeCursor = val.slice(lineStart, start);
+        if (beforeCursor.endsWith("  ")) {
+          editor.setSelectionRange(start - 2, start);
+          insertText("");
+        } else if (beforeCursor.endsWith(" ")) {
+          editor.setSelectionRange(start - 1, start);
+          insertText("");
+        }
+      } else {
+        insertText("  ");
+      }
+    }
+  }
+
+  function handleEnter(e) {
+    const start = editor.selectionStart;
+    const val = editor.value;
+    const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    const line = val.slice(lineStart, start);
+
+    // Task list
+    const taskMatch = line.match(/^(\s*[-*+]\s+\[(?: |x|X)\]\s+)(.*)$/);
+    if (taskMatch) {
+      e.preventDefault();
+      if (!taskMatch[2].trim()) {
+        editor.setSelectionRange(lineStart, start);
+        insertText("");
+      } else {
+        insertText("\n- [ ] ");
+      }
+      return true;
+    }
+
+    // Numbered list
+    const numMatch = line.match(/^(\s*)(\d+)([.)]\s+)(.*)$/);
+    if (numMatch) {
+      e.preventDefault();
+      if (!numMatch[4].trim()) {
+        editor.setSelectionRange(lineStart, start);
+        insertText("");
+      } else {
+        const nextNum = parseInt(numMatch[2], 10) + 1;
+        insertText(`\n${numMatch[1]}${nextNum}${numMatch[3]}`);
+      }
+      return true;
+    }
+
+    // Unordered list
+    const bulletMatch = line.match(/^(\s*[-*+]\s+)(.*)$/);
+    if (bulletMatch) {
+      e.preventDefault();
+      if (!bulletMatch[2].trim()) {
+        editor.setSelectionRange(lineStart, start);
+        insertText("");
+      } else {
+        insertText(`\n${bulletMatch[1]}`);
+      }
+      return true;
+    }
+
+    // Blockquote
+    const quoteMatch = line.match(/^(\s*>\s?)(.*)$/);
+    if (quoteMatch) {
+      e.preventDefault();
+      if (!quoteMatch[2].trim()) {
+        editor.setSelectionRange(lineStart, start);
+        insertText("");
+      } else {
+        insertText("\n> ");
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  const PAIRS = {
+    "(": ")",
+    "[": "]",
+    "{": "}",
+    '"': '"',
+    "'": "'",
+    "`": "`",
+    "*": "*",
+    "_": "_",
+    "~": "~",
+  };
+
+  /* ---------- open file & new document ---------- */
+  function openFile() {
+    let fileInput = document.getElementById("fileInput");
+    if (!fileInput) {
+      fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.id = "fileInput";
+      fileInput.accept = ".md,.markdown,.txt";
+      fileInput.style.display = "none";
+      document.body.appendChild(fileInput);
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          editor.value = evt.target.result;
+          scheduleRender();
+          scheduleSaveNow();
+          updateCaret();
+        };
+        reader.readAsText(file);
+        fileInput.value = "";
+      });
+    }
+    fileInput.click();
+  }
+
+  function newDocument() {
+    if (editor.value.trim().length > 0) {
+      if (!confirm("Start a new document? Any unsaved edits will be replaced.")) {
+        return;
+      }
+    }
+    editor.value = "# Untitled\n\n";
+    scheduleRender();
+    scheduleSaveNow();
+    updateCaret();
+    editor.focus();
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  }
+
+  /* ---------- shortcuts modal ---------- */
+  function openModal() {
+    if (shortcutsModal) shortcutsModal.removeAttribute("hidden");
+  }
+
+  function closeModal() {
+    if (shortcutsModal) shortcutsModal.setAttribute("hidden", "");
+    editor.focus();
+  }
+
+  function toggleModal() {
+    if (!shortcutsModal) return;
+    if (shortcutsModal.hasAttribute("hidden")) {
+      openModal();
+    } else {
+      closeModal();
+    }
+  }
+
+  if (shortcutsBtn) shortcutsBtn.addEventListener("click", toggleModal);
+  if (modalCloseBtn) modalCloseBtn.addEventListener("click", closeModal);
+  if (shortcutsModal) {
+    shortcutsModal.addEventListener("click", (e) => {
+      if (e.target === shortcutsModal) closeModal();
+    });
+  }
+  if (openBtn) openBtn.addEventListener("click", openFile);
+
   /* ---------- keyboard shortcuts ---------- */
   document.addEventListener("keydown", (e) => {
     const meta = e.metaKey || e.ctrlKey;
-    if (!meta) return;
+    const isEditor = document.activeElement === editor;
     const k = e.key.toLowerCase();
 
-    if (k === "s") {
-      e.preventDefault();
-      store.set(KEY.text, editor.value);
-      statSaved.textContent = "Saved";
-      statSaved.classList.add("flash");
-      setTimeout(() => statSaved.classList.remove("flash"), 1200);
+    // Escape closes shortcuts modal if open
+    if (e.key === "Escape") {
+      if (shortcutsModal && !shortcutsModal.hasAttribute("hidden")) {
+        e.preventDefault();
+        closeModal();
+        return;
+      }
     }
-    if (k === "b") {
+
+    // Toggle shortcuts modal: Cmd+/ or Ctrl+/
+    if (meta && (e.key === "/" || e.key === "?")) {
       e.preventDefault();
-      setEditorVisible(app.classList.contains("editor-hidden"));
+      toggleModal();
+      return;
     }
-    if (k === "d") {
+
+    // Help: '?' when not typing in editor
+    if (e.key === "?" && !isEditor && !meta && !e.altKey) {
       e.preventDefault();
-      themeBtn.click();
+      toggleModal();
+      return;
+    }
+
+    // Global App shortcuts
+    if (meta) {
+      // Save: Cmd+S / Ctrl+S
+      if (k === "s" && !e.shiftKey) {
+        e.preventDefault();
+        scheduleSaveNow();
+        return;
+      }
+
+      // Export: Cmd+Shift+S / Ctrl+Shift+S
+      if (k === "s" && e.shiftKey) {
+        e.preventDefault();
+        exportBtn.click();
+        return;
+      }
+
+      // Open: Cmd+O / Ctrl+O
+      if (k === "o") {
+        e.preventDefault();
+        openFile();
+        return;
+      }
+
+      // Theme toggle: Cmd+D / Ctrl+D (when not Shift)
+      if (k === "d" && !e.shiftKey) {
+        e.preventDefault();
+        themeBtn.click();
+        return;
+      }
+
+      // New document: Cmd+Alt+N / Ctrl+Alt+N
+      if (k === "n" && e.altKey) {
+        e.preventDefault();
+        newDocument();
+        return;
+      }
+
+      // Print: Cmd+P / Ctrl+P
+      if (k === "p" && !e.shiftKey) {
+        e.preventDefault();
+        window.print();
+        return;
+      }
+
+      // Toggle editor: Cmd+\ or Cmd+Shift+E
+      if (e.key === "\\" || (k === "e" && e.shiftKey)) {
+        e.preventDefault();
+        setEditorVisible(app.classList.contains("editor-hidden"));
+        return;
+      }
+
+      // Cmd+B / Ctrl+B:
+      // If editor is not active or editor is hidden, toggle editor!
+      // If editor is active and visible, bold!
+      if (k === "b") {
+        e.preventDefault();
+        if (app.classList.contains("editor-hidden") || !isEditor) {
+          setEditorVisible(app.classList.contains("editor-hidden"));
+        } else {
+          applyWrap("**");
+        }
+        return;
+      }
+    }
+
+    // Editor formatting & typing helpers
+    if (isEditor) {
+      // Auto-wrap selection on typing pair characters
+      if (PAIRS[e.key] && editor.selectionStart !== editor.selectionEnd && !meta && !e.altKey) {
+        e.preventDefault();
+        applyWrap(e.key, PAIRS[e.key]);
+        return;
+      }
+
+      // Tab and Shift+Tab
+      if (e.key === "Tab") {
+        e.preventDefault();
+        handleTab(e.shiftKey);
+        return;
+      }
+
+      // Smart Enter
+      if (e.key === "Enter" && !e.shiftKey && !meta && !e.altKey) {
+        if (handleEnter(e)) return;
+      }
+
+      if (meta) {
+        // Italic: Cmd+I / Ctrl+I
+        if (k === "i") {
+          e.preventDefault();
+          applyWrap("*");
+          return;
+        }
+
+        // Inline Code: Cmd+E / Ctrl+E
+        if (k === "e" && !e.shiftKey) {
+          e.preventDefault();
+          applyWrap("`");
+          return;
+        }
+
+        // Link: Cmd+K / Ctrl+K
+        if (k === "k" && !e.shiftKey) {
+          e.preventDefault();
+          applyLink();
+          return;
+        }
+
+        // Strikethrough: Cmd+Shift+X or Cmd+Shift+K
+        if ((k === "x" || k === "k") && e.shiftKey) {
+          e.preventDefault();
+          applyWrap("~~");
+          return;
+        }
+
+        // Code block: Cmd+Shift+C
+        if (k === "c" && e.shiftKey) {
+          e.preventDefault();
+          applyCodeBlock();
+          return;
+        }
+
+        // Bullet list: Cmd+Shift+U or Cmd+Shift+8
+        if ((k === "u" || e.key === "*") && e.shiftKey) {
+          e.preventDefault();
+          applyList("bullet");
+          return;
+        }
+
+        // Numbered list: Cmd+Shift+O or Cmd+Shift+7
+        if ((k === "o" || e.key === "&") && e.shiftKey) {
+          e.preventDefault();
+          applyList("number");
+          return;
+        }
+
+        // Task list: Cmd+Shift+T
+        if (k === "t" && e.shiftKey) {
+          e.preventDefault();
+          applyList("task");
+          return;
+        }
+
+        // Blockquote: Cmd+Shift+Q or Cmd+Shift+.
+        if ((k === "q" || e.key === ">") && e.shiftKey) {
+          e.preventDefault();
+          applyList("quote");
+          return;
+        }
+
+        // Horizontal rule: Cmd+Shift+H
+        if (k === "h" && e.shiftKey) {
+          e.preventDefault();
+          applyHorizontalRule();
+          return;
+        }
+
+        // Duplicate line: Cmd+Shift+D
+        if (k === "d" && e.shiftKey) {
+          e.preventDefault();
+          duplicateCurrentLine();
+          return;
+        }
+
+        // Headings: Cmd+Alt+0..6 or Cmd+0..6
+        if (e.key >= "0" && e.key <= "6" && (e.altKey || !isMac)) {
+          e.preventDefault();
+          applyHeading(parseInt(e.key, 10));
+          return;
+        }
+      }
     }
   });
 
@@ -990,6 +1865,20 @@ const focus = "less, but better";
 
     const split = parseFloat(store.get(KEY.split, "44"));
     if (!Number.isNaN(split)) editorPane.style.flexBasis = split + "%";
+
+    const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    const modSymbol = isMac ? "⌘" : "Ctrl+";
+    const shiftSymbol = isMac ? "⇧" : "Shift+";
+
+    document.querySelectorAll("kbd[data-mac]").forEach((kbd) => {
+      kbd.textContent = isMac ? kbd.dataset.mac : kbd.dataset.win;
+    });
+
+    menuBtn.title = `Toggle editor (${modSymbol}\\ or ${modSymbol}B)`;
+    themeBtn.title = `Toggle theme (${modSymbol}D)`;
+    exportBtn.title = `Download as .md (${modSymbol}${shiftSymbol}S)`;
+    if (shortcutsBtn) shortcutsBtn.title = `Keyboard shortcuts (${modSymbol}/)`;
+    if (openBtn) openBtn.title = `Open file (${modSymbol}O)`;
 
     render();
     updateCaret();

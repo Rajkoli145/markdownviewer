@@ -26,4 +26,35 @@ Open `index.html` in any modern browser — or serve the folder:
 npx serve .
 ```
 
-Keyboard shortcuts: `⌘S` force-save · `⌘B` toggle editor · `⌘D` toggle theme.
+## Keyboard Shortcuts
+
+Press `⌘/` or `Ctrl+/` (or click the keyboard icon in the topbar) anytime to open the interactive shortcuts cheat sheet:
+
+| Category | Shortcut (Mac) | Shortcut (Win/Linux) | Action |
+| :--- | :--- | :--- | :--- |
+| **Document** | `⌘S` | `Ctrl+S` | Force-save to local storage |
+| | `⌘⇧S` | `Ctrl+Shift+S` | Export / download as `.md` |
+| | `⌘O` | `Ctrl+O` | Open local markdown file |
+| | `⌘⌥N` | `Ctrl+Alt+N` | New document / clear editor |
+| | `⌘P` | `Ctrl+P` | Print / save as clean PDF |
+| **View** | `⌘\` or `⌘⇧E` | `Ctrl+\` or `Ctrl+Shift+E` | Toggle editor pane |
+| | `⌘D` | `Ctrl+D` | Toggle dark / light theme |
+| | `⌘/` | `Ctrl+/` | Open keyboard shortcuts modal |
+| **Formatting** | `⌘B` | `Ctrl+B` | **Bold** selection (or toggle editor if outside) |
+| | `⌘I` | `Ctrl+I` | *Italic* selection |
+| | `⌘E` | `Ctrl+E` | `Inline code` |
+| | `⌘K` | `Ctrl+K` | Insert link `[text](url)` |
+| | `⌘⇧X` | `Ctrl+Shift+X` | ~~Strikethrough~~ |
+| | `⌘⇧C` | `Ctrl+Shift+C` | Fenced code block |
+| | `⌘⌥1`–`6` | `Ctrl+Alt+1`–`6` | Heading level 1 to 6 |
+| | `⌘⌥0` | `Ctrl+Alt+0` | Normal text / paragraph |
+| **Lists & Blocks**| `⌘⇧U` | `Ctrl+Shift+U` | Bullet list (`- `) |
+| | `⌘⇧O` | `Ctrl+Shift+O` | Numbered list (`1. `) |
+| | `⌘⇧T` | `Ctrl+Shift+T` | Task checklist (`- [ ] `) |
+| | `⌘⇧Q` | `Ctrl+Shift+Q` | Blockquote (`> `) |
+| | `⌘⇧H` | `Ctrl+Shift+H` | Horizontal rule (`---`) |
+| | `Tab` / `⇧Tab` | `Tab` / `Shift+Tab` | Indent / outdent line(s) with 2 spaces |
+| **Smart Helpers** | `Enter` | `Enter` | Automatically continues lists and tasks |
+| | `(`, `[`, `{`, `"`, `` ` ``, `*` | *(same)* | Auto-wraps selected text with delimiter pair |
+| | `⌘⇧D` | `Ctrl+Shift+D` | Duplicate current line |
+
