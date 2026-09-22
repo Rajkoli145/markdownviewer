@@ -1,29 +1,63 @@
 # Markdown Viewer
 
-A minimal, premium markdown editor + viewer that runs entirely in the browser. No dependencies, no build step.
+A minimal, premium markdown editor, viewer, and note-taking workspace that runs entirely in the browser. Zero dependencies, no build step, works 100% offline, and includes optional cloud synchronization via Supabase.
 
 ## Features
 
+- **Folder & Note Explorer** — organize markdown documents into nested folders and subfolders right from the sidebar
 - **Live preview** — compiled markdown appears as you type (80ms debounce)
-- **Hide / show editor** — the ☰ button or `⌘B` / `Ctrl+B` slides the editor away for a clean reading view
+- **Supabase Cloud Sync (Optional)** — sync all folders and notes to your own Supabase PostgreSQL database using standard REST API (no backend or npm dependencies required)
+- **Local-First Persistence** — everything works immediately offline; documents, folders, active file, theme, and window states are stored in `localStorage`
+- **Instant Search / Filter** — search across all files in your workspace in real-time
+- **Hide / show editor** — the ☰ button or `⌘\` / `⌘B` slides the editor away for a clean reading view
+- **Hide / show explorer** — the sidebar icon or `⌘⌥B` / `Ctrl+Alt+B` toggles the folder sidebar
 - **Dark & light mode** — sun/moon toggle or `⌘D` / `Ctrl+D`, respects your system preference on first load
-- **Everything persists** — document, theme, editor visibility, and split position are stored in `localStorage`
-- **Resizable split** — drag the divider (20–75%)
+- **Resizable split** — drag dividers between the sidebar, editor, and preview panes
 - **Scroll sync** — proportional editor ↔ preview scrolling
-- **Export** — download the document as a `.md` file (download icon)
+- **Export** — download the active document as a `.md` file
 - **Safe by design** — the renderer escapes all input and whitelists only known-safe URL schemes; no raw `innerHTML` of user content
-- Statusbar: word count, save state, `Ln/Col` position
+- **Statusbar**: live word count, save state indicator, file breadcrumb path, cloud sync status, and `Ln/Col` cursor position
 
-## Supported syntax
+## Supported Syntax
 
-Headings, bold/italic/strikethrough, inline code, fenced code blocks, links, images (http/mailto/relative only), autolinks, blockquotes, ordered/unordered lists, task lists, tables (with alignment), horizontal rules.
+Headings (`#`–`######`), bold/italic/strikethrough, inline code, fenced code blocks with language headers and copy buttons, links, images (http/mailto/relative only), autolinks, blockquotes, ordered/unordered lists, task lists (`- [x]`), tables (with alignment), horizontal rules.
+
+## Cloud Sync Setup (Supabase)
+
+Cloud sync is completely optional. If you don't connect a cloud, all your notes and folders are saved safely in your browser's local storage.
+
+If you'd like to sync across devices:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Go to the **SQL Editor** in your Supabase dashboard and run this snippet to create the table:
+   ```sql
+   create table if not exists markdown_items (
+     id text primary key,
+     name text not null,
+     type text not null check (type in ('file', 'folder')),
+     parent_id text,
+     content text default '',
+     created_at timestamptz default now(),
+     updated_at timestamptz default now()
+   );
+   alter table markdown_items enable row level security;
+   create policy "public_access" on markdown_items for all using (true) with check (true);
+   ```
+3. In Markdown Viewer, click the **Cloud icon** in the topbar or sidebar.
+4. Paste your **Project URL** and **Anon Public API Key** (found under Project Settings &rarr; API).
+5. Click **Connect & Sync**. Your files will now automatically auto-save and sync to your database!
 
 ## Run it
 
-Open `index.html` in any modern browser — or serve the folder:
+Open `index.html` directly in any modern browser — or serve the folder locally:
 
 ```bash
 npx serve .
+```
+
+Or deploy directly to Vercel:
+```bash
+vercel --prod
 ```
 
 ## Keyboard Shortcuts
@@ -32,14 +66,15 @@ Press `⌘/` or `Ctrl+/` (or click the keyboard icon in the topbar) anytime to o
 
 | Category | Shortcut (Mac) | Shortcut (Win/Linux) | Action |
 | :--- | :--- | :--- | :--- |
-| **Document** | `⌘S` | `Ctrl+S` | Force-save to local storage |
-| | `⌘⇧S` | `Ctrl+Shift+S` | Export / download as `.md` |
-| | `⌘O` | `Ctrl+O` | Open local markdown file |
-| | `⌘⌥N` | `Ctrl+Alt+N` | New document / clear editor |
-| | `⌘P` | `Ctrl+P` | Print / save as clean PDF |
-| **View** | `⌘\` or `⌘⇧E` | `Ctrl+\` or `Ctrl+Shift+E` | Toggle editor pane |
+| **Explorer & View** | `⌘⌥B` | `Ctrl+Alt+B` | Toggle folder explorer sidebar |
+| | `⌘\` or `⌘⇧E` | `Ctrl+\` or `Ctrl+Shift+E` | Toggle editor pane |
 | | `⌘D` | `Ctrl+D` | Toggle dark / light theme |
 | | `⌘/` | `Ctrl+/` | Open keyboard shortcuts modal |
+| **Document** | `⌘S` | `Ctrl+S` | Save to local storage & cloud |
+| | `⌘⇧S` | `Ctrl+Shift+S` | Export / download active note as `.md` |
+| | `⌘O` | `Ctrl+O` | Open local markdown file into explorer |
+| | `⌘⌥N` | `Ctrl+Alt+N` | New document |
+| | `⌘P` | `Ctrl+P` | Print / save as clean PDF |
 | **Formatting** | `⌘B` | `Ctrl+B` | **Bold** selection (or toggle editor if outside) |
 | | `⌘I` | `Ctrl+I` | *Italic* selection |
 | | `⌘E` | `Ctrl+E` | `Inline code` |
@@ -57,4 +92,3 @@ Press `⌘/` or `Ctrl+/` (or click the keyboard icon in the topbar) anytime to o
 | **Smart Helpers** | `Enter` | `Enter` | Automatically continues lists and tasks |
 | | `(`, `[`, `{`, `"`, `` ` ``, `*` | *(same)* | Auto-wraps selected text with delimiter pair |
 | | `⌘⇧D` | `Ctrl+Shift+D` | Duplicate current line |
-

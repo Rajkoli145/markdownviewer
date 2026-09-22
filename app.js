@@ -23,6 +23,31 @@
   const statWords = $("#statStats");
   const statSaved = $("#statSaved");
   const statPos = $("#statPos");
+  const statCloud = $("#statCloud");
+  const statPath = $("#statPath");
+
+  // Sidebar & Explorer DOM
+  const sidebar = $("#sidebar");
+  const sidebarGutter = $("#sidebarGutter");
+  const sidebarToggleBtn = $("#sidebarToggleBtn");
+  const newFileBtn = $("#newFileBtn");
+  const newFolderBtn = $("#newFolderBtn");
+  const fileSearch = $("#fileSearch");
+  const fileTree = $("#fileTree");
+  const activeFileName = $("#activeFileName");
+  const breadcrumbFolder = $("#breadcrumbFolder");
+
+  // Cloud Sync DOM
+  const cloudBtn = $("#cloudBtn");
+  const cloudStatusBtn = $("#cloudStatusBtn");
+  const cloudModal = $("#cloudModal");
+  const cloudModalCloseBtn = $("#cloudModalCloseBtn");
+  const cloudUrlInput = $("#cloudUrlInput");
+  const cloudKeyInput = $("#cloudKeyInput");
+  const cloudConnectBtn = $("#cloudConnectBtn");
+  const cloudDisconnectBtn = $("#cloudDisconnectBtn");
+  const cloudStatusMsg = $("#cloudStatusMsg");
+  const sqlCopyBtn = $("#sqlCopyBtn");
 
   /* ---------- Persistence ---------- */
   const KEY = {
@@ -30,6 +55,12 @@
     theme: "mdv.theme",
     editor: "mdv.editor",
     split: "mdv.split",
+    sidebar: "mdv.sidebar",
+    sidebarSplit: "mdv.sidebarSplit",
+    items: "mdv.items",
+    activeId: "mdv.activeId",
+    cloudUrl: "mdv.cloud.url",
+    cloudKey: "mdv.cloud.key",
   };
   const store = {
     get(k, fallback) {
@@ -389,25 +420,528 @@ const focus = "less, but better";
     renderTimer = setTimeout(render, 80);
   };
 
+  /* ============================================================
+     Cloud Sync (Supabase REST API)
+     ============================================================ */
+  const CloudSync = {
+    getUrl() {
+      return (store.get(KEY.cloudUrl, "") || "").trim().replace(/\/+$/, "");
+    },
+    getKey() {
+      return (store.get(KEY.cloudKey, "") || "").trim();
+    },
+    isConnected() {
+      return Boolean(this.getUrl() && this.getKey());
+    },
+    getHeaders() {
+      const key = this.getKey();
+      return {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates"
+      };
+    },
+    async testConnection(url, key) {
+      url = url.trim().replace(/\/+$/, "");
+      key = key.trim();
+      const res = await fetch(`${url}/rest/v1/markdown_items?select=id&limit=1`, {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`
+        }
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      return true;
+    },
+    async fetchAll() {
+      if (!this.isConnected()) return null;
+      const res = await fetch(`${this.getUrl()}/rest/v1/markdown_items?select=*`, {
+        headers: {
+          apikey: this.getKey(),
+          Authorization: `Bearer ${this.getKey()}`
+        }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    },
+    async upsert(item) {
+      if (!this.isConnected()) return;
+      const payload = {
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        parent_id: item.parent_id || null,
+        content: item.content || "",
+        updated_at: item.updated_at || new Date().toISOString()
+      };
+      await fetch(`${this.getUrl()}/rest/v1/markdown_items`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload)
+      });
+    },
+    async upsertBatch(batch) {
+      if (!this.isConnected() || !batch.length) return;
+      const payload = batch.map((item) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        parent_id: item.parent_id || null,
+        content: item.content || "",
+        updated_at: item.updated_at || new Date().toISOString()
+      }));
+      await fetch(`${this.getUrl()}/rest/v1/markdown_items`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload)
+      });
+    },
+    async deleteItem(id) {
+      if (!this.isConnected()) return;
+      await fetch(`${this.getUrl()}/rest/v1/markdown_items?id=eq.${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: this.getHeaders()
+      });
+      await fetch(`${this.getUrl()}/rest/v1/markdown_items?parent_id=eq.${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: this.getHeaders()
+      });
+    }
+  };
+
+  /* ============================================================
+     Folder & File Storage Engine
+     ============================================================ */
+  let items = [];
+  let activeId = null;
+  const openFolderIds = new Set(["folder-notes"]);
+  let cloudSyncTimer = null;
+
+  function initItems() {
+    let saved = null;
+    try {
+      const raw = localStorage.getItem(KEY.items);
+      if (raw) saved = JSON.parse(raw);
+    } catch { /* empty */ }
+
+    if (!Array.isArray(saved) || saved.length === 0) {
+      const now = new Date().toISOString();
+      const existingText = store.get(KEY.text, null);
+      const folderId = "folder-notes";
+      const welcomeId = "file-welcome";
+
+      saved = [
+        {
+          id: folderId,
+          name: "Notes",
+          type: "folder",
+          parent_id: null,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: "file-quick-thoughts",
+          name: "Quick Thoughts.md",
+          type: "file",
+          parent_id: folderId,
+          content: `# Quick Thoughts\n\n- Folders and files are now organized in the sidebar!\n- Create new folders, sub-notes, and switch between them.\n- Connect your Supabase database in Cloud Settings for instant cloud sync.\n`,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: welcomeId,
+          name: "welcome.md",
+          type: "file",
+          parent_id: null,
+          content: existingText || WELCOME,
+          created_at: now,
+          updated_at: now
+        }
+      ];
+      store.set(KEY.items, JSON.stringify(saved));
+    }
+
+    items = saved;
+    activeId = store.get(KEY.activeId, null);
+    if (!activeId || !items.find((it) => it.id === activeId && it.type === "file")) {
+      const firstFile = items.find((it) => it.type === "file");
+      activeId = firstFile ? firstFile.id : null;
+      if (activeId) store.set(KEY.activeId, activeId);
+    }
+  }
+
+  function getActiveItem() {
+    return items.find((it) => it.id === activeId);
+  }
+
+  function saveActiveItem() {
+    const item = getActiveItem();
+    if (item) {
+      item.content = editor.value;
+      item.updated_at = new Date().toISOString();
+      store.set(KEY.items, JSON.stringify(items));
+      store.set(KEY.text, editor.value);
+    }
+  }
+
+  function getFolderPath(folderId) {
+    const parts = [];
+    let cur = folderId;
+    while (cur) {
+      const f = items.find((it) => it.id === cur && it.type === "folder");
+      if (!f) break;
+      parts.unshift(f.name);
+      cur = f.parent_id;
+    }
+    return parts.length ? parts.join(" / ") + " /" : "";
+  }
+
+  function updateBreadcrumb() {
+    const item = getActiveItem();
+    if (!item) {
+      if (breadcrumbFolder) breadcrumbFolder.textContent = "";
+      if (activeFileName) activeFileName.value = "";
+      if (statPath) statPath.textContent = "";
+      return;
+    }
+    const path = getFolderPath(item.parent_id);
+    if (breadcrumbFolder) breadcrumbFolder.textContent = path;
+    if (activeFileName) activeFileName.value = item.name;
+    if (statPath) statPath.textContent = path ? `${path} ${item.name}` : item.name;
+  }
+
+  function switchFile(id) {
+    if (activeId === id) return;
+    saveActiveItem();
+    activeId = id;
+    store.set(KEY.activeId, activeId);
+    const item = getActiveItem();
+    if (item) {
+      editor.value = item.content || "";
+      scheduleRender();
+      updateBreadcrumb();
+      updateCaret();
+      renderFileTree();
+    }
+  }
+
+  function createFile(name, parent_id = null) {
+    saveActiveItem();
+    const finalName = (name || prompt("Note name:", "Untitled.md") || "Untitled.md").trim();
+    if (!finalName) return;
+    const withExt = finalName.endsWith(".md") || finalName.endsWith(".markdown") ? finalName : finalName + ".md";
+    const now = new Date().toISOString();
+    const newItem = {
+      id: "file-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      name: withExt,
+      type: "file",
+      parent_id: parent_id,
+      content: `# ${withExt.replace(/\.md$/i, "")}\n\n`,
+      created_at: now,
+      updated_at: now
+    };
+    items.push(newItem);
+    if (parent_id) openFolderIds.add(parent_id);
+    store.set(KEY.items, JSON.stringify(items));
+    switchFile(newItem.id);
+    renderFileTree();
+    editor.focus();
+    if (CloudSync.isConnected()) {
+      CloudSync.upsert(newItem).catch(() => updateCloudStatus("error"));
+    }
+  }
+
+  function createFolder(name, parent_id = null) {
+    const finalName = (name || prompt("Folder name:", "New Folder") || "").trim();
+    if (!finalName) return;
+    const now = new Date().toISOString();
+    const newFolder = {
+      id: "folder-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      name: finalName,
+      type: "folder",
+      parent_id: parent_id,
+      created_at: now,
+      updated_at: now
+    };
+    items.push(newFolder);
+    openFolderIds.add(newFolder.id);
+    if (parent_id) openFolderIds.add(parent_id);
+    store.set(KEY.items, JSON.stringify(items));
+    renderFileTree();
+    if (CloudSync.isConnected()) {
+      CloudSync.upsert(newFolder).catch(() => updateCloudStatus("error"));
+    }
+  }
+
+  function renameItem(id) {
+    const item = items.find((it) => it.id === id);
+    if (!item) return;
+    const newName = (prompt(`Rename ${item.type}:`, item.name) || "").trim();
+    if (!newName || newName === item.name) return;
+    item.name = newName;
+    item.updated_at = new Date().toISOString();
+    store.set(KEY.items, JSON.stringify(items));
+    updateBreadcrumb();
+    renderFileTree();
+    if (CloudSync.isConnected()) {
+      CloudSync.upsert(item).catch(() => updateCloudStatus("error"));
+    }
+  }
+
+  function deleteItem(id) {
+    const item = items.find((it) => it.id === id);
+    if (!item) return;
+
+    if (item.type === "folder") {
+      if (!confirm(`Delete folder "${item.name}" and all notes inside?`)) return;
+    } else {
+      if (!confirm(`Delete note "${item.name}"?`)) return;
+    }
+
+    const toDeleteIds = new Set([id]);
+    function collectChildren(parentId) {
+      items.filter((it) => it.parent_id === parentId).forEach((child) => {
+        toDeleteIds.add(child.id);
+        if (child.type === "folder") collectChildren(child.id);
+      });
+    }
+    collectChildren(id);
+
+    items = items.filter((it) => !toDeleteIds.has(it.id));
+
+    if (toDeleteIds.has(activeId)) {
+      const nextFile = items.find((it) => it.type === "file");
+      if (nextFile) {
+        activeId = nextFile.id;
+        editor.value = nextFile.content || "";
+      } else {
+        createFile("welcome.md", null);
+        return;
+      }
+    }
+
+    store.set(KEY.items, JSON.stringify(items));
+    store.set(KEY.activeId, activeId);
+    updateBreadcrumb();
+    scheduleRender();
+    renderFileTree();
+
+    if (CloudSync.isConnected()) {
+      CloudSync.deleteItem(id).catch(() => updateCloudStatus("error"));
+    }
+  }
+
+  function renderFileTree() {
+    if (!fileTree) return;
+    const query = (fileSearch ? fileSearch.value : "").trim().toLowerCase();
+
+    let filtered = items;
+    if (query) {
+      filtered = items.filter((it) => it.name.toLowerCase().includes(query) || (it.content && it.content.toLowerCase().includes(query)));
+    }
+
+    if (filtered.length === 0) {
+      fileTree.innerHTML = `<div class="tree-empty">No ${query ? "matching notes" : "files found"}.<br><button class="btn-primary" style="margin-top:10px; font-size:11px; padding:4px 10px;" id="emptyNewFileBtn">+ Create Note</button></div>`;
+      const btn = $("#emptyNewFileBtn");
+      if (btn) btn.addEventListener("click", () => createFile("Untitled.md"));
+      return;
+    }
+
+    function renderLevel(parentId) {
+      const children = filtered.filter((it) => it.parent_id === parentId);
+      children.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      let html = "";
+      for (const item of children) {
+        if (item.type === "folder") {
+          const isOpen = openFolderIds.has(item.id) || !!query;
+          const subCount = items.filter((it) => it.parent_id === item.id).length;
+          html += `
+            <div class="tree-folder ${isOpen ? "open" : ""}" data-id="${item.id}">
+              <div class="tree-folder-header">
+                <span class="folder-arrow">
+                  <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3.5l4.5 4.5-4.5 4.5"/></svg>
+                </span>
+                <svg class="folder-icon" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6z"/>
+                </svg>
+                <span class="folder-title" title="${esc(item.name)}">${esc(item.name)}</span>
+                <span class="folder-count">${subCount}</span>
+                <div class="tree-actions">
+                  <button class="tree-action-btn action-add-file" title="New file inside folder" data-id="${item.id}">
+                    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
+                  </button>
+                  <button class="tree-action-btn action-rename" title="Rename folder" data-id="${item.id}">
+                    <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11z"/></svg>
+                  </button>
+                  <button class="tree-action-btn action-delete" title="Delete folder" data-id="${item.id}">
+                    <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h10M6 5V3h4v2M5 5v8h6V5"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="tree-children">
+                ${renderLevel(item.id)}
+              </div>
+            </div>
+          `;
+        } else {
+          const isActive = item.id === activeId;
+          html += `
+            <div class="tree-file ${isActive ? "active" : ""}" data-id="${item.id}" title="${esc(item.name)}">
+              <svg class="file-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4.5 3.5h7l4 4v9a1.5 1.5 0 0 1-1.5 1.5h-9.5A1.5 1.5 0 0 1 3 16.5v-11.5A1.5 1.5 0 0 1 4.5 3.5z"/>
+                <path d="M11.5 3.5v4h4M6.5 11.5h7M6.5 14.5h4"/>
+              </svg>
+              <span class="file-title">${esc(item.name)}</span>
+              <div class="tree-actions">
+                <button class="tree-action-btn action-rename" title="Rename" data-id="${item.id}">
+                  <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11z"/></svg>
+                </button>
+                <button class="tree-action-btn action-delete" title="Delete" data-id="${item.id}">
+                  <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h10M6 5V3h4v2M5 5v8h6V5"/></svg>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+      }
+      return html;
+    }
+
+    fileTree.innerHTML = renderLevel(null);
+  }
+
+  function updateCloudStatus(status, text) {
+    const dots = document.querySelectorAll(".cloud-status-dot");
+    dots.forEach((d) => {
+      d.className = "cloud-status-dot " + (status || "");
+    });
+
+    if (statCloud) {
+      if (status === "synced") {
+        statCloud.innerHTML = `☁️ Synced`;
+        statCloud.title = "Supabase Cloud: Synced and active (click to manage)";
+      } else if (status === "syncing") {
+        statCloud.innerHTML = `☁️ Syncing…`;
+        statCloud.title = "Supabase Cloud: Sync in progress";
+      } else if (status === "error") {
+        statCloud.innerHTML = `⚠️ Cloud error`;
+        statCloud.title = text || "Supabase Cloud: Connection or table error (click to configure)";
+      } else {
+        statCloud.innerHTML = `☁️ Local storage`;
+        statCloud.title = "Operating in local storage (click to setup Supabase Cloud sync)";
+      }
+    }
+  }
+
+  async function performFullCloudSync() {
+    if (!CloudSync.isConnected()) return;
+    updateCloudStatus("syncing");
+
+    try {
+      const remoteItems = await CloudSync.fetchAll();
+      if (!Array.isArray(remoteItems)) return;
+
+      const remoteMap = new Map(remoteItems.map((r) => [r.id, r]));
+      const localMap = new Map(items.map((l) => [l.id, l]));
+
+      const toUpload = [];
+      const merged = [];
+
+      for (const local of items) {
+        const remote = remoteMap.get(local.id);
+        if (!remote) {
+          toUpload.push(local);
+          merged.push(local);
+        } else {
+          const localTime = new Date(local.updated_at || 0).getTime();
+          const remoteTime = new Date(remote.updated_at || 0).getTime();
+          if (localTime >= remoteTime) {
+            toUpload.push(local);
+            merged.push(local);
+          } else {
+            merged.push(remote);
+          }
+        }
+      }
+
+      for (const remote of remoteItems) {
+        if (!localMap.has(remote.id)) {
+          merged.push(remote);
+        }
+      }
+
+      items = merged;
+      store.set(KEY.items, JSON.stringify(items));
+
+      if (toUpload.length) {
+        await CloudSync.upsertBatch(toUpload);
+      }
+
+      const cur = getActiveItem();
+      if (cur) {
+        editor.value = cur.content || "";
+        scheduleRender();
+      }
+
+      renderFileTree();
+      updateBreadcrumb();
+      updateCloudStatus("synced");
+    } catch (err) {
+      console.error("Full cloud sync error:", err);
+      updateCloudStatus("error", err.message);
+      throw err;
+    }
+  }
+
   let saveTimer = null;
   function scheduleSave() {
     clearTimeout(saveTimer);
     statSaved.textContent = "Saving…";
     statSaved.classList.remove("flash");
     saveTimer = setTimeout(() => {
-      store.set(KEY.text, editor.value);
+      saveActiveItem();
       statSaved.textContent = "Saved";
       statSaved.classList.add("flash");
       setTimeout(() => statSaved.classList.remove("flash"), 1200);
     }, 500);
+
+    if (CloudSync.isConnected()) {
+      clearTimeout(cloudSyncTimer);
+      updateCloudStatus("syncing");
+      cloudSyncTimer = setTimeout(async () => {
+        try {
+          const item = getActiveItem();
+          if (item) {
+            await CloudSync.upsert(item);
+            updateCloudStatus("synced");
+          }
+        } catch (err) {
+          console.error("Cloud auto-sync error:", err);
+          updateCloudStatus("error");
+        }
+      }, 1500);
+    }
   }
 
   function scheduleSaveNow() {
     clearTimeout(saveTimer);
-    store.set(KEY.text, editor.value);
+    saveActiveItem();
     statSaved.textContent = "Saved";
     statSaved.classList.add("flash");
     setTimeout(() => statSaved.classList.remove("flash"), 1200);
+
+    if (CloudSync.isConnected()) {
+      const item = getActiveItem();
+      if (item) CloudSync.upsert(item).catch(() => updateCloudStatus("error"));
+    }
   }
 
   function render() {
@@ -846,10 +1380,8 @@ const focus = "less, but better";
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (evt) => {
-          editor.value = evt.target.result;
-          scheduleRender();
-          scheduleSaveNow();
-          updateCaret();
+          const content = evt.target.result;
+          createFile(file.name, null, content);
         };
         reader.readAsText(file);
         fileInput.value = "";
@@ -859,17 +1391,225 @@ const focus = "less, but better";
   }
 
   function newDocument() {
-    if (editor.value.trim().length > 0) {
-      if (!confirm("Start a new document? Any unsaved edits will be replaced.")) {
+    createFile("Untitled.md", null);
+  }
+
+  /* ---------- sidebar show / hide ---------- */
+  function setSidebarVisible(visible, persist = true) {
+    app.classList.toggle("sidebar-hidden", !visible);
+    if (sidebarToggleBtn) {
+      sidebarToggleBtn.classList.toggle("on", visible);
+      sidebarToggleBtn.setAttribute("aria-pressed", String(visible));
+    }
+    if (persist) store.set(KEY.sidebar, visible ? "1" : "0");
+  }
+
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener("click", () => {
+      setSidebarVisible(app.classList.contains("sidebar-hidden"));
+    });
+  }
+
+  if (newFileBtn) newFileBtn.addEventListener("click", () => createFile("Untitled.md"));
+  if (newFolderBtn) newFolderBtn.addEventListener("click", () => createFolder("New Folder"));
+
+  if (fileSearch) {
+    fileSearch.addEventListener("input", () => {
+      renderFileTree();
+    });
+  }
+
+  if (activeFileName) {
+    activeFileName.addEventListener("change", () => {
+      const item = getActiveItem();
+      if (!item) return;
+      const newName = activeFileName.value.trim();
+      if (newName && newName !== item.name) {
+        item.name = newName;
+        item.updated_at = new Date().toISOString();
+        store.set(KEY.items, JSON.stringify(items));
+        renderFileTree();
+        if (CloudSync.isConnected()) {
+          CloudSync.upsert(item).catch(() => updateCloudStatus("error"));
+        }
+      }
+    });
+    activeFileName.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        activeFileName.blur();
+      }
+    });
+  }
+
+  if (fileTree) {
+    fileTree.addEventListener("click", (e) => {
+      const addBtn = e.target.closest(".action-add-file");
+      if (addBtn) {
+        e.stopPropagation();
+        createFile("Untitled.md", addBtn.dataset.id);
         return;
       }
-    }
-    editor.value = "# Untitled\n\n";
-    scheduleRender();
-    scheduleSaveNow();
-    updateCaret();
+      const renBtn = e.target.closest(".action-rename");
+      if (renBtn) {
+        e.stopPropagation();
+        renameItem(renBtn.dataset.id);
+        return;
+      }
+      const delBtn = e.target.closest(".action-delete");
+      if (delBtn) {
+        e.stopPropagation();
+        deleteItem(delBtn.dataset.id);
+        return;
+      }
+
+      const folderHeader = e.target.closest(".tree-folder-header");
+      if (folderHeader) {
+        const folder = folderHeader.closest(".tree-folder");
+        const folderId = folder.dataset.id;
+        if (openFolderIds.has(folderId)) {
+          openFolderIds.delete(folderId);
+        } else {
+          openFolderIds.add(folderId);
+        }
+        renderFileTree();
+        return;
+      }
+
+      const fileRow = e.target.closest(".tree-file");
+      if (fileRow) {
+        switchFile(fileRow.dataset.id);
+      }
+    });
+  }
+
+  function initSidebarGutter() {
+    let dragging = false;
+    let raf = 0;
+
+    if (!sidebarGutter) return;
+
+    sidebarGutter.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      sidebarGutter.classList.add("dragging");
+      sidebarGutter.setPointerCapture(e.pointerId);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    });
+
+    sidebarGutter.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const rect = surface.getBoundingClientRect();
+        let width = e.clientX - rect.left;
+        width = Math.min(420, Math.max(160, width));
+        sidebar.style.flexBasis = width + "px";
+        sidebar.style.width = width + "px";
+        store.set(KEY.sidebarSplit, String(Math.round(width)));
+      });
+    });
+
+    const endDrag = () => {
+      dragging = false;
+      sidebarGutter.classList.remove("dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    sidebarGutter.addEventListener("pointerup", endDrag);
+    sidebarGutter.addEventListener("pointercancel", endDrag);
+  }
+
+  /* ---------- cloud modal ---------- */
+  function openCloudModal() {
+    if (!cloudModal) return;
+    if (cloudUrlInput) cloudUrlInput.value = CloudSync.getUrl();
+    if (cloudKeyInput) cloudKeyInput.value = CloudSync.getKey();
+    if (cloudStatusMsg) cloudStatusMsg.style.display = "none";
+    cloudModal.removeAttribute("hidden");
+  }
+
+  function closeCloudModal() {
+    if (!cloudModal) return;
+    cloudModal.setAttribute("hidden", "");
     editor.focus();
-    editor.setSelectionRange(editor.value.length, editor.value.length);
+  }
+
+  if (cloudBtn) cloudBtn.addEventListener("click", openCloudModal);
+  if (cloudStatusBtn) cloudStatusBtn.addEventListener("click", openCloudModal);
+  if (statCloud) statCloud.addEventListener("click", openCloudModal);
+  if (cloudModalCloseBtn) cloudModalCloseBtn.addEventListener("click", closeCloudModal);
+  if (cloudModal) {
+    cloudModal.addEventListener("click", (e) => {
+      if (e.target === cloudModal) closeCloudModal();
+    });
+  }
+
+  if (sqlCopyBtn) {
+    sqlCopyBtn.addEventListener("click", () => {
+      const code = $("#sqlSnippet") ? $("#sqlSnippet").textContent : "";
+      navigator.clipboard.writeText(code).then(() => {
+        const orig = sqlCopyBtn.textContent;
+        sqlCopyBtn.textContent = "Copied!";
+        setTimeout(() => (sqlCopyBtn.textContent = orig), 1500);
+      });
+    });
+  }
+
+  function showCloudMessage(msg, type) {
+    if (!cloudStatusMsg) return;
+    cloudStatusMsg.textContent = msg;
+    cloudStatusMsg.className = "cloud-status-msg " + (type || "");
+    cloudStatusMsg.style.display = "block";
+  }
+
+  if (cloudConnectBtn) {
+    cloudConnectBtn.addEventListener("click", async () => {
+      const url = cloudUrlInput ? cloudUrlInput.value.trim() : "";
+      const key = cloudKeyInput ? cloudKeyInput.value.trim() : "";
+
+      if (!url || !key) {
+        showCloudMessage("Please enter both the Supabase URL and Anon Key.", "error");
+        return;
+      }
+
+      cloudConnectBtn.disabled = true;
+      cloudConnectBtn.textContent = "Connecting…";
+      showCloudMessage("Testing connection to Supabase…", "");
+
+      try {
+        await CloudSync.testConnection(url, key);
+        store.set(KEY.cloudUrl, url);
+        store.set(KEY.cloudKey, key);
+
+        showCloudMessage("Connected! Syncing notes…", "");
+        await performFullCloudSync();
+
+        showCloudMessage(`Connected successfully! Synced ${items.length} items.`, "success");
+        updateCloudStatus("synced");
+      } catch (err) {
+        console.error(err);
+        showCloudMessage(
+          `Connection failed: ${err.message}. Make sure you ran the SQL table setup in Supabase SQL Editor.`,
+          "error"
+        );
+        updateCloudStatus("error", err.message);
+      } finally {
+        cloudConnectBtn.disabled = false;
+        cloudConnectBtn.textContent = "Connect & Sync Now";
+      }
+    });
+  }
+
+  if (cloudDisconnectBtn) {
+    cloudDisconnectBtn.addEventListener("click", () => {
+      if (!confirm("Disconnect Supabase Cloud Sync? Your local notes will remain intact.")) return;
+      store.set(KEY.cloudUrl, "");
+      store.set(KEY.cloudKey, "");
+      if (cloudUrlInput) cloudUrlInput.value = "";
+      if (cloudKeyInput) cloudKeyInput.value = "";
+      showCloudMessage("Disconnected. Operating in local storage mode.", "success");
+      updateCloudStatus("");
+    });
   }
 
   /* ---------- shortcuts modal ---------- */
@@ -906,11 +1646,16 @@ const focus = "less, but better";
     const isEditor = document.activeElement === editor;
     const k = e.key.toLowerCase();
 
-    // Escape closes shortcuts modal if open
+    // Escape closes modals if open
     if (e.key === "Escape") {
       if (shortcutsModal && !shortcutsModal.hasAttribute("hidden")) {
         e.preventDefault();
         closeModal();
+        return;
+      }
+      if (cloudModal && !cloudModal.hasAttribute("hidden")) {
+        e.preventDefault();
+        closeCloudModal();
         return;
       }
     }
@@ -931,6 +1676,13 @@ const focus = "less, but better";
 
     // Global App shortcuts
     if (meta) {
+      // Toggle sidebar: Cmd+Alt+B or Cmd+Shift+B
+      if ((k === "b" && e.altKey) || (k === "b" && e.shiftKey)) {
+        e.preventDefault();
+        setSidebarVisible(app.classList.contains("sidebar-hidden"));
+        return;
+      }
+
       // Save: Cmd+S / Ctrl+S
       if (k === "s" && !e.shiftKey) {
         e.preventDefault();
@@ -996,104 +1748,89 @@ const focus = "less, but better";
 
     // Editor formatting & typing helpers
     if (isEditor) {
-      // Auto-wrap selection on typing pair characters
       if (PAIRS[e.key] && editor.selectionStart !== editor.selectionEnd && !meta && !e.altKey) {
         e.preventDefault();
         applyWrap(e.key, PAIRS[e.key]);
         return;
       }
 
-      // Tab and Shift+Tab
       if (e.key === "Tab") {
         e.preventDefault();
         handleTab(e.shiftKey);
         return;
       }
 
-      // Smart Enter
       if (e.key === "Enter" && !e.shiftKey && !meta && !e.altKey) {
         if (handleEnter(e)) return;
       }
 
       if (meta) {
-        // Italic: Cmd+I / Ctrl+I
         if (k === "i") {
           e.preventDefault();
           applyWrap("*");
           return;
         }
 
-        // Inline Code: Cmd+E / Ctrl+E
         if (k === "e" && !e.shiftKey) {
           e.preventDefault();
           applyWrap("`");
           return;
         }
 
-        // Link: Cmd+K / Ctrl+K
         if (k === "k" && !e.shiftKey) {
           e.preventDefault();
           applyLink();
           return;
         }
 
-        // Strikethrough: Cmd+Shift+X or Cmd+Shift+K
         if ((k === "x" || k === "k") && e.shiftKey) {
           e.preventDefault();
           applyWrap("~~");
           return;
         }
 
-        // Code block: Cmd+Shift+C
         if (k === "c" && e.shiftKey) {
           e.preventDefault();
           applyCodeBlock();
           return;
         }
 
-        // Bullet list: Cmd+Shift+U or Cmd+Shift+8
         if ((k === "u" || e.key === "*") && e.shiftKey) {
           e.preventDefault();
           applyList("bullet");
           return;
         }
 
-        // Numbered list: Cmd+Shift+O or Cmd+Shift+7
         if ((k === "o" || e.key === "&") && e.shiftKey) {
           e.preventDefault();
           applyList("number");
           return;
         }
 
-        // Task list: Cmd+Shift+T
         if (k === "t" && e.shiftKey) {
           e.preventDefault();
           applyList("task");
           return;
         }
 
-        // Blockquote: Cmd+Shift+Q or Cmd+Shift+.
         if ((k === "q" || e.key === ">") && e.shiftKey) {
           e.preventDefault();
           applyList("quote");
           return;
         }
 
-        // Horizontal rule: Cmd+Shift+H
         if (k === "h" && e.shiftKey) {
           e.preventDefault();
           applyHorizontalRule();
           return;
         }
 
-        // Duplicate line: Cmd+Shift+D
         if (k === "d" && e.shiftKey) {
           e.preventDefault();
           duplicateCurrentLine();
           return;
         }
 
-        // Headings: Cmd+Alt+0..6 or Cmd+0..6
         if (e.key >= "0" && e.key <= "6" && (e.altKey || !isMac)) {
           e.preventDefault();
           applyHeading(parseInt(e.key, 10));
@@ -1105,13 +1842,13 @@ const focus = "less, but better";
 
   /* ---------- export ---------- */
   exportBtn.addEventListener("click", () => {
+    const item = getActiveItem();
+    let filename = item ? item.name : "document.md";
+    if (!filename.endsWith(".md")) filename += ".md";
     const blob = new Blob([editor.value], { type: "text/markdown;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const title =
-      ((editor.value.match(/^\s*#\s+(.+)$/m) || [])[1] || "document")
-        .trim().slice(0, 60);
-    a.download = title.replace(/[\\/:*?"<>|]/g, "-") + ".md";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1120,8 +1857,10 @@ const focus = "less, but better";
 
   /* ---------- restore state ---------- */
   (function restore() {
-    const saved = store.get(KEY.text, null);
-    editor.value = saved !== null ? saved : WELCOME;
+    initItems();
+
+    const activeItem = getActiveItem();
+    editor.value = activeItem ? (activeItem.content || "") : WELCOME;
 
     applyTheme(
       store.get(KEY.theme, null) ||
@@ -1129,28 +1868,49 @@ const focus = "less, but better";
     );
 
     setEditorVisible(store.get(KEY.editor, "1") !== "0", false);
+    setSidebarVisible(store.get(KEY.sidebar, "1") !== "0", false);
 
     const split = parseFloat(store.get(KEY.split, "44"));
     if (!Number.isNaN(split)) editorPane.style.flexBasis = split + "%";
 
+    const sidebarSplit = parseFloat(store.get(KEY.sidebarSplit, "240"));
+    if (!Number.isNaN(sidebarSplit) && sidebar) {
+      sidebar.style.flexBasis = sidebarSplit + "px";
+      sidebar.style.width = sidebarSplit + "px";
+    }
+
     const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
     const modSymbol = isMac ? "⌘" : "Ctrl+";
+    const altSymbol = isMac ? "⌥" : "Alt+";
     const shiftSymbol = isMac ? "⇧" : "Shift+";
 
     document.querySelectorAll("kbd[data-mac]").forEach((kbd) => {
       kbd.textContent = isMac ? kbd.dataset.mac : kbd.dataset.win;
     });
 
+    if (sidebarToggleBtn) sidebarToggleBtn.title = `Toggle explorer (${modSymbol}${altSymbol}B)`;
     menuBtn.title = `Toggle editor (${modSymbol}\\ or ${modSymbol}B)`;
     themeBtn.title = `Toggle theme (${modSymbol}D)`;
     exportBtn.title = `Download as .md (${modSymbol}${shiftSymbol}S)`;
     if (shortcutsBtn) shortcutsBtn.title = `Keyboard shortcuts (${modSymbol}/)`;
     if (openBtn) openBtn.title = `Open file (${modSymbol}O)`;
+    if (cloudStatusBtn) cloudStatusBtn.title = `Supabase Cloud Sync`;
 
+    renderFileTree();
+    updateBreadcrumb();
     render();
     updateCaret();
+
+    // Init cloud status & background sync
+    if (CloudSync.isConnected()) {
+      updateCloudStatus("synced");
+      performFullCloudSync().catch(() => {});
+    } else {
+      updateCloudStatus("");
+    }
   })();
 
   initGutter();
+  initSidebarGutter();
   initScrollSync();
 })();
