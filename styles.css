@@ -822,6 +822,87 @@ kbd {
 
 /* ---------- Cloud Modal & Status ---------- */
 
+.sync-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+  height: 32px;
+  padding: 0 11px 0 9px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+  transition: all .18s var(--ease);
+}
+.sync-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+.sync-btn:active {
+  transform: scale(.96);
+}
+.sync-btn .sync-icon {
+  flex-shrink: 0;
+  transition: transform .25s var(--ease);
+}
+.sync-btn.syncing {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, .4);
+}
+.sync-btn.syncing .sync-icon {
+  animation: syncSpin .85s linear infinite;
+  color: #f59e0b;
+}
+.sync-btn.synced {
+  color: #10b981;
+  border-color: rgba(16, 185, 129, .4);
+}
+.sync-btn.synced .sync-icon {
+  color: #10b981;
+}
+.sync-btn.error {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, .4);
+}
+.sync-btn .cloud-status-dot {
+  position: static;
+  display: inline-block;
+  margin-left: 1px;
+}
+
+.sidebar-icon-btn.syncing svg {
+  animation: syncSpin .85s linear infinite;
+  color: #f59e0b;
+}
+
+@keyframes syncSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sql-details {
+  margin: 12px 0 16px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.sql-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+  user-select: none;
+  outline: none;
+}
+.sql-details summary:hover {
+  text-decoration: underline;
+}
+
 .cloud-status-dot {
   width: 7px;
   height: 7px;

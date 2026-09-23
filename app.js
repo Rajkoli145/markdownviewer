@@ -38,6 +38,9 @@
   const breadcrumbFolder = $("#breadcrumbFolder");
 
   // Cloud Sync DOM
+  const syncBtn = $("#syncBtn");
+  const syncBtnLabel = $("#syncBtnLabel");
+  const sidebarSyncBtn = $("#sidebarSyncBtn");
   const cloudBtn = $("#cloudBtn");
   const cloudStatusBtn = $("#cloudStatusBtn");
   const cloudModal = $("#cloudModal");
@@ -423,15 +426,22 @@ const focus = "less, but better";
   /* ============================================================
      Cloud Sync (Supabase REST API)
      ============================================================ */
+  const DEFAULT_SUPABASE_URL = "https://ksyxioqmkwznzrqmsotf.supabase.co";
+  let DEFAULT_SUPABASE_KEY = ""; // Optional hardcoded key when provided
+
   const CloudSync = {
     getUrl() {
-      return (store.get(KEY.cloudUrl, "") || "").trim().replace(/\/+$/, "");
+      return (store.get(KEY.cloudUrl, DEFAULT_SUPABASE_URL) || DEFAULT_SUPABASE_URL).trim().replace(/\/+$/, "");
     },
     getKey() {
+      if (DEFAULT_SUPABASE_KEY) return DEFAULT_SUPABASE_KEY;
       return (store.get(KEY.cloudKey, "") || "").trim();
     },
+    setKey(k) {
+      store.set(KEY.cloudKey, (k || "").trim());
+    },
     isConnected() {
-      return Boolean(this.getUrl() && this.getKey());
+      return Boolean(this.getKey());
     },
     getHeaders() {
       const key = this.getKey();
@@ -443,8 +453,12 @@ const focus = "less, but better";
       };
     },
     async testConnection(url, key) {
-      url = url.trim().replace(/\/+$/, "");
-      key = key.trim();
+      if (arguments.length === 1) {
+        key = url;
+        url = this.getUrl();
+      }
+      url = (url || this.getUrl()).trim().replace(/\/+$/, "");
+      key = (key || this.getKey()).trim();
       const res = await fetch(`${url}/rest/v1/markdown_items?select=id&limit=1`, {
         headers: {
           apikey: key,
@@ -465,7 +479,10 @@ const focus = "less, but better";
           Authorization: `Bearer ${this.getKey()}`
         }
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
       return await res.json();
     },
     async upsert(item) {
@@ -819,15 +836,40 @@ const focus = "less, but better";
   }
 
   function updateCloudStatus(status, text) {
+    const isConn = CloudSync.isConnected();
     const dots = document.querySelectorAll(".cloud-status-dot");
     dots.forEach((d) => {
-      d.className = "cloud-status-dot " + (status || "");
+      d.className = "cloud-status-dot " + (status || (isConn ? "synced" : ""));
     });
+
+    if (syncBtn) {
+      if (status === "syncing") {
+        syncBtn.className = "sync-btn syncing";
+        if (syncBtnLabel) syncBtnLabel.textContent = "Syncing…";
+      } else if (status === "synced") {
+        syncBtn.className = "sync-btn synced";
+        if (syncBtnLabel) syncBtnLabel.textContent = "Synced!";
+      } else if (status === "error") {
+        syncBtn.className = "sync-btn error";
+        if (syncBtnLabel) syncBtnLabel.textContent = "Sync Error";
+      } else {
+        syncBtn.className = "sync-btn" + (isConn ? " connected" : "");
+        if (syncBtnLabel) syncBtnLabel.textContent = "Sync";
+      }
+    }
+
+    if (sidebarSyncBtn) {
+      if (status === "syncing") {
+        sidebarSyncBtn.classList.add("syncing");
+      } else {
+        sidebarSyncBtn.classList.remove("syncing");
+      }
+    }
 
     if (statCloud) {
       if (status === "synced") {
         statCloud.innerHTML = `☁️ Synced`;
-        statCloud.title = "Supabase Cloud: Synced and active (click to manage)";
+        statCloud.title = "Supabase Cloud: Synced and active (click to sync/configure)";
       } else if (status === "syncing") {
         statCloud.innerHTML = `☁️ Syncing…`;
         statCloud.title = "Supabase Cloud: Sync in progress";
@@ -835,8 +877,8 @@ const focus = "less, but better";
         statCloud.innerHTML = `⚠️ Cloud error`;
         statCloud.title = text || "Supabase Cloud: Connection or table error (click to configure)";
       } else {
-        statCloud.innerHTML = `☁️ Local storage`;
-        statCloud.title = "Operating in local storage (click to setup Supabase Cloud sync)";
+        statCloud.innerHTML = isConn ? `☁️ Ready` : `☁️ Local storage`;
+        statCloud.title = isConn ? "Supabase Cloud ready (click to sync)" : "Operating in local storage (click to set Supabase anon key)";
       }
     }
   }
@@ -1519,13 +1561,19 @@ const focus = "less, but better";
     sidebarGutter.addEventListener("pointercancel", endDrag);
   }
 
-  /* ---------- cloud modal ---------- */
-  function openCloudModal() {
+  /* ---------- cloud modal & sync button ---------- */
+  function openCloudModal(initialMsg) {
     if (!cloudModal) return;
-    if (cloudUrlInput) cloudUrlInput.value = CloudSync.getUrl();
     if (cloudKeyInput) cloudKeyInput.value = CloudSync.getKey();
-    if (cloudStatusMsg) cloudStatusMsg.style.display = "none";
+    if (initialMsg) {
+      showCloudMessage(initialMsg, "error");
+    } else if (cloudStatusMsg) {
+      cloudStatusMsg.style.display = "none";
+    }
     cloudModal.removeAttribute("hidden");
+    if (cloudKeyInput) {
+      setTimeout(() => cloudKeyInput.focus(), 60);
+    }
   }
 
   function closeCloudModal() {
@@ -1534,9 +1582,51 @@ const focus = "less, but better";
     editor.focus();
   }
 
-  if (cloudBtn) cloudBtn.addEventListener("click", openCloudModal);
-  if (cloudStatusBtn) cloudStatusBtn.addEventListener("click", openCloudModal);
-  if (statCloud) statCloud.addEventListener("click", openCloudModal);
+  let isSyncing = false;
+
+  async function syncNow(interactive = false) {
+    if (isSyncing) return;
+    if (!CloudSync.isConnected()) {
+      if (interactive) {
+        openCloudModal();
+      }
+      return;
+    }
+
+    isSyncing = true;
+    updateCloudStatus("syncing");
+
+    try {
+      saveActiveItem();
+      await performFullCloudSync();
+      updateCloudStatus("synced");
+      setTimeout(() => {
+        if (!isSyncing && CloudSync.isConnected()) {
+          updateCloudStatus("synced");
+        }
+      }, 2000);
+    } catch (err) {
+      console.error("Sync error:", err);
+      let shortErr = err.message || "Failed";
+      if (shortErr.includes("UNAUTHORIZED") || shortErr.includes("Invalid API key") || shortErr.includes("No API key")) {
+        shortErr = "Invalid API Key";
+        if (interactive) openCloudModal("Invalid or missing Supabase anon API key. Please check your key.");
+      }
+      updateCloudStatus("error", shortErr);
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => syncNow(true));
+  }
+  if (sidebarSyncBtn) {
+    sidebarSyncBtn.addEventListener("click", () => syncNow(true));
+  }
+  if (cloudBtn) cloudBtn.addEventListener("click", () => syncNow(true));
+  if (cloudStatusBtn) cloudStatusBtn.addEventListener("click", () => syncNow(true));
+  if (statCloud) statCloud.addEventListener("click", () => openCloudModal());
   if (cloudModalCloseBtn) cloudModalCloseBtn.addEventListener("click", closeCloudModal);
   if (cloudModal) {
     cloudModal.addEventListener("click", (e) => {
@@ -1564,28 +1654,29 @@ const focus = "less, but better";
 
   if (cloudConnectBtn) {
     cloudConnectBtn.addEventListener("click", async () => {
-      const url = cloudUrlInput ? cloudUrlInput.value.trim() : "";
       const key = cloudKeyInput ? cloudKeyInput.value.trim() : "";
 
-      if (!url || !key) {
-        showCloudMessage("Please enter both the Supabase URL and Anon Key.", "error");
+      if (!key) {
+        showCloudMessage("Please enter your Supabase anon public API key.", "error");
         return;
       }
 
       cloudConnectBtn.disabled = true;
-      cloudConnectBtn.textContent = "Connecting…";
-      showCloudMessage("Testing connection to Supabase…", "");
+      cloudConnectBtn.textContent = "Testing & Syncing…";
+      showCloudMessage("Connecting to Supabase…", "");
 
       try {
-        await CloudSync.testConnection(url, key);
-        store.set(KEY.cloudUrl, url);
-        store.set(KEY.cloudKey, key);
+        await CloudSync.testConnection(key);
+        CloudSync.setKey(key);
 
-        showCloudMessage("Connected! Syncing notes…", "");
+        showCloudMessage("Connected! Syncing notes…", "success");
         await performFullCloudSync();
 
         showCloudMessage(`Connected successfully! Synced ${items.length} items.`, "success");
         updateCloudStatus("synced");
+        setTimeout(() => {
+          closeCloudModal();
+        }, 700);
       } catch (err) {
         console.error(err);
         showCloudMessage(
@@ -1595,17 +1686,15 @@ const focus = "less, but better";
         updateCloudStatus("error", err.message);
       } finally {
         cloudConnectBtn.disabled = false;
-        cloudConnectBtn.textContent = "Connect & Sync Now";
+        cloudConnectBtn.textContent = "Save & Sync Now";
       }
     });
   }
 
   if (cloudDisconnectBtn) {
     cloudDisconnectBtn.addEventListener("click", () => {
-      if (!confirm("Disconnect Supabase Cloud Sync? Your local notes will remain intact.")) return;
-      store.set(KEY.cloudUrl, "");
-      store.set(KEY.cloudKey, "");
-      if (cloudUrlInput) cloudUrlInput.value = "";
+      if (!confirm("Clear your saved Supabase key? Your local notes will remain intact.")) return;
+      CloudSync.setKey("");
       if (cloudKeyInput) cloudKeyInput.value = "";
       showCloudMessage("Disconnected. Operating in local storage mode.", "success");
       updateCloudStatus("");
@@ -1687,6 +1776,16 @@ const focus = "less, but better";
       if (k === "s" && !e.shiftKey) {
         e.preventDefault();
         scheduleSaveNow();
+        if (CloudSync.isConnected()) {
+          syncNow(false);
+        }
+        return;
+      }
+
+      // Cloud sync: Cmd+Shift+Y / Ctrl+Shift+Y
+      if (k === "y" && e.shiftKey) {
+        e.preventDefault();
+        syncNow(true);
         return;
       }
 
@@ -1894,7 +1993,9 @@ const focus = "less, but better";
     exportBtn.title = `Download as .md (${modSymbol}${shiftSymbol}S)`;
     if (shortcutsBtn) shortcutsBtn.title = `Keyboard shortcuts (${modSymbol}/)`;
     if (openBtn) openBtn.title = `Open file (${modSymbol}O)`;
-    if (cloudStatusBtn) cloudStatusBtn.title = `Supabase Cloud Sync`;
+    if (syncBtn) syncBtn.title = `Sync with Supabase (${modSymbol}${shiftSymbol}Y)`;
+    if (sidebarSyncBtn) sidebarSyncBtn.title = `Sync with Supabase (${modSymbol}${shiftSymbol}Y)`;
+    if (cloudStatusBtn) cloudStatusBtn.title = `Sync with Supabase (${modSymbol}${shiftSymbol}Y)`;
 
     renderFileTree();
     updateBreadcrumb();

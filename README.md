@@ -22,30 +22,29 @@ A minimal, premium markdown editor, viewer, and note-taking workspace that runs 
 
 Headings (`#`–`######`), bold/italic/strikethrough, inline code, fenced code blocks with language headers and copy buttons, links, images (http/mailto/relative only), autolinks, blockquotes, ordered/unordered lists, task lists (`- [x]`), tables (with alignment), horizontal rules.
 
-## Cloud Sync Setup (Supabase)
+## Cloud Sync (Supabase)
 
-Cloud sync is completely optional. If you don't connect a cloud, all your notes and folders are saved safely in your browser's local storage.
+Markdown Viewer is pre-configured with permanent Supabase Cloud Sync connected to your project:
+`https://ksyxioqmkwznzrqmsotf.supabase.co`
 
-If you'd like to sync across devices:
-
-1. Create a free project at [supabase.com](https://supabase.com).
-2. Go to the **SQL Editor** in your Supabase dashboard and run this snippet to create the table:
-   ```sql
-   create table if not exists markdown_items (
-     id text primary key,
-     name text not null,
-     type text not null check (type in ('file', 'folder')),
-     parent_id text,
-     content text default '',
-     created_at timestamptz default now(),
-     updated_at timestamptz default now()
-   );
-   alter table markdown_items enable row level security;
-   create policy "public_access" on markdown_items for all using (true) with check (true);
-   ```
-3. In Markdown Viewer, click the **Cloud icon** in the topbar or sidebar.
-4. Paste your **Project URL** and **Anon Public API Key** (found under Project Settings &rarr; API).
-5. Click **Connect & Sync**. Your files will now automatically auto-save and sync to your database!
+### 1-Click Sync
+- **Dedicated Sync Button**: Click **`Sync`** in the topbar or sidebar (or press **`⌘⇧Y`** / **`Ctrl+Shift+Y`**) to synchronize immediately.
+- **Auto-Sync on Save**: Pressing **`⌘S`** / **`Ctrl+S`** or typing automatically syncs changes in the background.
+- **First-Time Activation**: The very first time you sync, paste your Supabase **anon public API key** (from Supabase &rarr; Project Settings &rarr; API &rarr; Project API keys). Once saved, you will never be asked again — clicking **Sync** performs a direct sync instantly with no modal!
+- **Table Setup**: If you haven't created the table in your Supabase SQL Editor yet, run:
+  ```sql
+  create table if not exists markdown_items (
+    id text primary key,
+    name text not null,
+    type text not null check (type in ('file', 'folder')),
+    parent_id text,
+    content text default '',
+    created_at timestamptz default now(),
+    updated_at timestamptz default now()
+  );
+  alter table markdown_items enable row level security;
+  create policy "public_access" on markdown_items for all using (true) with check (true);
+  ```
 
 ## Run it
 
@@ -71,6 +70,7 @@ Press `⌘/` or `Ctrl+/` (or click the keyboard icon in the topbar) anytime to o
 | | `⌘D` | `Ctrl+D` | Toggle dark / light theme |
 | | `⌘/` | `Ctrl+/` | Open keyboard shortcuts modal |
 | **Document** | `⌘S` | `Ctrl+S` | Save to local storage & cloud |
+| | `⌘⇧Y` | `Ctrl+Shift+Y` | Sync with Supabase Cloud |
 | | `⌘⇧S` | `Ctrl+Shift+S` | Export / download active note as `.md` |
 | | `⌘O` | `Ctrl+O` | Open local markdown file into explorer |
 | | `⌘⌥N` | `Ctrl+Alt+N` | New document |
